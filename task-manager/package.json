@@ -2,9 +2,10 @@
   "name": "task-manager",
   "version": "1.0.0",
   "description": "",
+  "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest",
     "clean": "rm -rf dist",
     "build": "rm -rf dist && tsc"
   },
@@ -12,6 +13,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "@types/node": "^25.3.5",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }

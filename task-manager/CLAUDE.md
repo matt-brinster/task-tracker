@@ -18,21 +18,26 @@ npm run build      # compile TypeScript (outputs to dist/)
 npm run clean      # remove dist/
 ```
 
-No test framework is configured yet — the `test` script is a placeholder. When one is added, this file should be updated.
+**Test framework: Vitest.** Not yet installed — next step is to add it and write the first tests for the domain layer.
 
 ## Project Status
 
-Currently in **Phase 1: Core Domain Modeling**. The codebase is at the very start — `src/index.ts` is a placeholder. The immediate work is defining the task domain types and state machine.
+Currently in **Phase 1: Core Domain Modeling**. `src/domain/task.ts` has the `Task` type and `createTask` factory function. Next: domain operations (complete, snooze, block) and tests.
 
 See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
 
 ## Architecture
 
-The domain centers on a **task state machine** with five states:
+Layered architecture:
+- `src/domain/` — core types and pure functions (no I/O, no framework dependencies)
+- `src/repository/` — persistence (Phase 3)
+- `src/api/` — HTTP layer (Phase 2)
 
-- `todo` → `in_progress` → `done`
-- Any non-done state → `snoozed` (deferred with a timestamp) or `blocked`
-- State transition rules are still being designed (see the plan doc for open questions)
+There is **no state machine**. Task status is derived from data:
+1. Has `completedAt`? → Done
+2. Has incomplete blockers? → Blocked
+3. Has `snoozedUntil` in the future? → Snoozed
+4. Otherwise → the task's queue (`todo` or `backlog`)
 
 Source lives in `src/`, compiled output goes to `dist/`. The TypeScript config uses `module: "nodenext"`, so imports require explicit `.js` extensions even for `.ts` source files (e.g. `import { foo } from './foo.js'`).
 
