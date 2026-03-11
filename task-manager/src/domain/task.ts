@@ -9,10 +9,10 @@ export type Task = {
   queue: Queue
   completedAt: Date | null
   snoozedUntil: Date | null
-  blockerIds: string[]  // IDs of tasks that the user says will block this task
+  blockerIds: Set<string>  // IDs of tasks that the user says will block this task
 }
 
-export function createTask(title: string, details: string = "", queue: Queue = 'todo', blockerIds: string[] = [], snoozedUntil: Date | null = null): Task {
+export function createTask(title: string, details: string = "", queue: Queue = 'todo', blockerIds: Set<string> | null = null, snoozedUntil: Date | null = null): Task {
   return {
     id: randomUUID(),
     title: title.trim(),
@@ -20,6 +20,6 @@ export function createTask(title: string, details: string = "", queue: Queue = '
     queue,
     completedAt: null,
     snoozedUntil,
-    blockerIds,
+    blockerIds: blockerIds ?? new Set()
   }
 }
