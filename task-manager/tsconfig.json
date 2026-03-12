@@ -40,5 +40,5 @@
     "moduleDetection": "force",
     "skipLibCheck": true
   },
-  "exclude": ["dist", "vitest.config.ts", "test"]
+  "exclude": ["dist", "vitest.config.ts"]
 }
