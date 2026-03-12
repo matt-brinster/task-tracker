@@ -18,11 +18,17 @@ npm run build      # compile TypeScript (outputs to dist/)
 npm run clean      # remove dist/
 ```
 
-**Test framework: Vitest.** Not yet installed — next step is to add it and write the first tests for the domain layer.
+**Test framework: Vitest** (installed).
 
 ## Project Status
 
-Currently in **Phase 1: Core Domain Modeling**. `src/domain/task.ts` has the `Task` type and `createTask` factory function. Next: domain operations (complete, snooze, block) and tests.
+**Phase 1: Core Domain Modeling** — in progress.
+
+Completed:
+- `src/domain/task.ts` — `Task` type and `createTask` factory
+- `src/domain/task_operations.ts` — `completeTask`, `reopenTask`, `snoozeTask`, `wakeTask`, `addBlockerIds`, `removeBlockerIds`
+- `src/domain/task_operations.test.ts` — full test coverage for all operations above
+- `src/domain/user.ts` — `User` type (id, email; no operations)
 
 See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
 
@@ -33,11 +39,9 @@ Layered architecture:
 - `src/repository/` — persistence (Phase 3)
 - `src/api/` — HTTP layer (Phase 2)
 
-There is **no state machine**. Task status is derived from data:
-1. Has `completedAt`? → Done
-2. Has incomplete blockers? → Blocked
-3. Has `snoozedUntil` in the future? → Snoozed
-4. Otherwise → the task's queue (`todo` or `backlog`)
+There is **no state machine** and no derived "status" field. The domain exposes raw data; the API and UI decide how to present it. Domain predicates may be added as needed (e.g. `isComplete`, `isSnoozed`), but status display logic belongs to the presentation layer.
+
+**Blockers:** `blockerIds` is a set of task IDs. It is not automatically cleaned up when a blocking task completes. Stale blocker ID cleanup is deferred.
 
 Source lives in `src/`, compiled output goes to `dist/`. The TypeScript config uses `module: "nodenext"`, so imports require explicit `.js` extensions even for `.ts` source files (e.g. `import { foo } from './foo.js'`).
 

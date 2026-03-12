@@ -4,6 +4,7 @@ export type Queue = 'todo' | 'backlog'
 
 export type Task = {
   id: string
+  userId: string
   title: string
   details: string
   queue: Queue
@@ -12,9 +13,10 @@ export type Task = {
   blockerIds: Set<string>  // IDs of tasks that the user says will block this task
 }
 
-export function createTask(title: string, details: string = "", queue: Queue = 'todo', blockerIds: Set<string> | null = null, snoozedUntil: Date | null = null): Task {
+export function createTask(userId: string, title: string, details: string = "", queue: Queue = 'todo', blockerIds: Set<string> | null = null, snoozedUntil: Date | null = null): Task {
   return {
     id: randomUUID(),
+    userId,
     title: title.trim(),
     details,
     queue,

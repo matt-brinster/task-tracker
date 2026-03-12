@@ -1,53 +1,89 @@
 # Task Manager Project Plan
 
 ## Overview
-A **personal** task manager application built with TypeScript and Node.js. This is a tool for one person to manage their own tasks quickly, not a team collaboration or project management tool. Design priorities are speed of use and low ceremony.
+A task manager application built with TypeScript and Node.js. Supports a small number of users (family). Design priorities are speed of use and low ceremony.
 
 Also serves as a learning vehicle for strengthening JavaScript and TypeScript skills.
 
 ## Data Model
 
+### User
+A user has:
+- **id:** GUID
+- **email:** string
+
+Credentials (session tokens, verification tokens) are an infrastructure concern, not modeled in the domain. User provisioning is manual — the admin inserts rows directly into the DB.
+
 ### Task
 A task has:
+- **userId:** GUID. Every task belongs to a user. Tasks are siloed per user.
 - **Queue:** Todo or Backlog. Todo is the default. Backlog is a low priority "someday maybe" bucket.
 - **completedAt:** Nullable timestamp. Set means done.
 - **snoozedUntil:** Nullable timestamp. Set and in the future means snoozed.
-- **Blockers:** A collection of other tasks that must be completed first. A task is blocked if and only if it has incomplete blockers.
-
-### Derived Display Status
-The status a user sees is computed from data, not stored explicitly. Precedence order:
-
-1. Has `completedAt`? → **Done**
-2. Has incomplete blockers? → **Blocked**
-3. Has `snoozedUntil` in the future? → **Snoozed**
-4. Otherwise → the task's **queue** (Todo or Backlog)
+- **Blockers:** A collection of other task IDs that block this task. Stored as a junction table in the DB. Not automatically cleaned up when a blocker is completed.
 
 ### Operations
 There is no state machine. "Transitions" are data operations:
 - **Complete:** Set `completedAt`
-- **Uncomplete (undo):** Clear `completedAt`. The task returns to whatever its underlying situation is (queue, blockers, snooze).
+- **Uncomplete (undo):** Clear `completedAt`
 - **Snooze:** Set `snoozedUntil`
 - **Unsnooze:** Clear `snoozedUntil` (or let it expire)
-- **Block:** Add a blocker relationship to another task
-- **Unblock:** Automatically resolved when the blocking task is completed
+- **Block:** Add blocker IDs to a task
+- **Unblock:** Remove blocker IDs from a task (not automatic)
 - **Promote/Demote:** Move between Todo and Backlog queues
 
+Display logic (what status to show, how to handle a task that is both snoozed and blocked, etc.) belongs to the presentation layer, not the domain. The domain exposes raw data.
+
+### What the Frontend Will Likely Do
+
+The frontend receives raw task data and is responsible for:
+
+- **Filtering into views:** e.g. "actionable" (incomplete, not snoozed, no open blockers), "snoozed", "blocked", "done"
+- **Deriving display status:** its own priority logic — e.g. show "Blocked (2 open)" even if a task is also snoozed
+- **Checking blockers:** iterate `blockerIds`, look up each task, decide which are open vs. complete — the API should make this cheap (e.g. return referenced blocker tasks alongside the task, or let the client query them)
+- **Snooze expiry:** treat `snoozedUntil < now` as "no longer snoozed"; the domain doesn't proactively clear it
+- **Undo-friendly operations:** because operations are simple data changes (not state transitions), the frontend can optimistically revert them
+
 ### Edge Cases
-- A task that is both snoozed and blocked displays as Blocked (harder constraint wins)
-- A task that is completed ignores blockers and snooze for display purposes
 - Cycle detection for blocker chains is deferred
+- Stale blocker ID cleanup (blockers pointing to completed tasks) is deferred
 
 ### Snooze Behavior
 - Short term: expired snoozes are resolved lazily on task lookup
 - Scheduled/proactive snooze handling comes in Phase 4
 
+## Authentication
+
+Passwordless magic link flow:
+1. Admin adds user's email to the `users` table directly
+2. User visits app on a new device, enters their email
+3. App checks email exists in `users`, sends a magic link
+4. User clicks link — token is consumed, a long-lived session token is issued for that device
+5. Device stores the session token and sends it as a bearer token on all subsequent requests
+
+### DB Tables (auth)
+- **`users`**: `id`, `email`
+- **`pending_verifications`**: `id`, `email`, `token`, `expires_at` — consumed on use
+- **`sessions`**: `id`, `user_id`, `token_hash`, `created_at`, `last_used_at` — one row per verified device
+
+## Storage
+
+### Database
+**MongoDB.** Good fit for the document shape of tasks, natural for embedded arrays (`blockerIds`, `sessions`), and a learning goal in its own right.
+
+### Collections
+- **`tasks`**: one document per task, `blockerIds` stored as an array field
+- **`users`**: one document per user, `sessions` embedded as an array
+- **`pending_verifications`**: magic link tokens, with a TTL index on `expiresAt` for automatic expiry
+
+### Repository Layer
+A DB gateway abstracts all storage. The rest of the app works only with domain types (`Task`, `User`); the repository handles SQL, row mapping, and type conversion (e.g. timestamp strings → `Date`, blocker rows → `Set<string>`).
+
 ## Phases
 
 ### Phase 1: Core Domain Modeling (TypeScript)
-- Define Task types using union literal types
-- Implement derived status computation
+- Define Task and User types
 - Write pure functions for task operations (complete, snooze, block, queue changes)
-- Blocker relationships
 - Type system enforcement where possible, runtime checks where necessary
 - Full test coverage
 - **Learning focus:** TypeScript fundamentals, type system, JS runtime behavior, testing
@@ -55,20 +91,22 @@ There is no state machine. "Transitions" are data operations:
 ### Phase 2: REST API Layer
 - HTTP framework (Express or Fastify, TBD)
 - Routing, validation, error handling
+- Auth middleware (bearer token → session lookup → userId on request)
+- Request logging
 - **Learning focus:** Node.js async patterns, middleware, request/response lifecycle
 
 ### Phase 3: Persistence
-- Database integration (TBD)
-- ORM or query builder (TBD)
-- **Learning focus:** async I/O, connection management, migrations
+- MongoDB integration
+- Repository layer implementing the DB gateway interface
+- Indexes (userId, completedAt, TTL on pending_verifications)
+- **Learning focus:** async I/O, MongoDB driver, document modeling, indexing
 
 ### Phase 4: Snooze/Timer Mechanics
-- Time based state transitions
-- Handling server restarts (persistence of scheduled events)
+- Proactive snooze handling (wake tasks when snooze expires)
+- Handling server restarts
 - **Learning focus:** Node.js event loop, scheduling, async patterns
 
 ### Future Possibilities
-- Authentication
 - Frontend (framework TBD, gesture/swipe driven for fast interaction)
 - Websockets for real time updates
 - Priority with a priority queue (with starvation prevention)
@@ -86,5 +124,4 @@ There is no state machine. "Transitions" are data operations:
 - Prioritize understanding over shipping
 - Surface JavaScript fundamentals underneath TypeScript
 - Discuss what TS compiles to at runtime
-- Hints and guidance before full solutions
 - Smaller projects may be interspersed as needed
