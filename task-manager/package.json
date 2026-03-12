@@ -14,7 +14,11 @@
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^25.3.5",
+    "@types/uuid": "^10.0.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "uuid": "^13.0.0"
   }
 }

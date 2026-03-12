@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto'
+import { v7 as uuidv7 } from 'uuid'
 
 export type Queue = 'todo' | 'backlog'
 
@@ -15,7 +15,7 @@ export type Task = {
 
 export function createTask(userId: string, title: string, details: string = "", queue: Queue = 'todo', blockerIds: Set<string> | null = null, snoozedUntil: Date | null = null): Task {
   return {
-    id: randomUUID(),
+    id: uuidv7(),
     userId,
     title: title.trim(),
     details,
