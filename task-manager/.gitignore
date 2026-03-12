@@ -10,6 +10,8 @@ scratch/
 # Environment
 .env
 .env.*
+!.env.example
+!.env.*.example
 
 # OS
 .DS_Store

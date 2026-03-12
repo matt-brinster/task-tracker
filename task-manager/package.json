@@ -19,6 +19,7 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "mongodb": "^7.1.0",
     "uuid": "^13.0.0"
   }
 }
