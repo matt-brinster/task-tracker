@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createTask } from './task.js'
-import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, addBlockers, removeBlockers } from './task_operations.js'
+import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, addBlockers, removeBlockers, setQueue } from './task_operations.js'
 
 const blocker1 = { id: 'id-1', title: 'Blocker 1' }
 const blocker2 = { id: 'id-2', title: 'Blocker 2' }
@@ -243,5 +243,43 @@ describe('removeBlockers', () => {
     expect(result.queue).toBe(task.queue)
     expect(result.completedAt).toBe(task.completedAt)
     expect(result.snoozedUntil).toBe(task.snoozedUntil)
+  })
+})
+
+describe('setQueue', () => {
+  it('moves a task from todo to backlog', () => {
+    const task = createTask('user-1', 'Buy milk')
+    expect(task.queue).toBe('todo')
+    const result = setQueue(task, 'backlog')
+    expect(result.queue).toBe('backlog')
+  })
+
+  it('moves a task from backlog to todo', () => {
+    const task = createTask('user-1', 'Buy milk', '', 'backlog')
+    const result = setQueue(task, 'todo')
+    expect(result.queue).toBe('todo')
+  })
+
+  it('is a no-op when setting the same queue', () => {
+    const task = createTask('user-1', 'Buy milk')
+    const result = setQueue(task, 'todo')
+    expect(result.queue).toBe('todo')
+  })
+
+  it('does not mutate the original task', () => {
+    const task = createTask('user-1', 'Buy milk')
+    setQueue(task, 'backlog')
+    expect(task.queue).toBe('todo')
+  })
+
+  it('preserves all other fields', () => {
+    const task = createTask('user-1', 'Buy milk', 'from the shop', 'todo', [blocker1])
+    const result = setQueue(task, 'backlog')
+    expect(result.id).toBe(task.id)
+    expect(result.title).toBe(task.title)
+    expect(result.details).toBe(task.details)
+    expect(result.completedAt).toBe(task.completedAt)
+    expect(result.snoozedUntil).toBe(task.snoozedUntil)
+    expect(result.blockers).toEqual(task.blockers)
   })
 })

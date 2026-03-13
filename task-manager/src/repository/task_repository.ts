@@ -4,6 +4,7 @@ import type { Task, Queue, Blocker } from '../domain/task.js'
 import { db } from './client.js'
 
 /** The shape of a task document in MongoDB. */
+// TODO: refactor tests, remove export
 export type TaskDocument = {
   _id: string
   userId: string
@@ -30,6 +31,7 @@ function toDocument(task: Task): TaskDocument {
   }
 }
 
+// TODO: refactor tests, remove export
 export function fromDocument(doc: TaskDocument): Task {
   return {
     id: doc._id,
@@ -64,6 +66,14 @@ export async function findTaskById(userId: string, taskId: string): Promise<Task
 export async function findOpenTasks(userId: string, limit = 1000): Promise<Task[]> {
   const docs = await collection()
     .find({ userId, deletedAt: null, completedAt: null })
+    .limit(limit)
+    .toArray()
+  return docs.map(fromDocument)
+}
+
+export async function searchTasks(userId: string, query: string, limit = 100): Promise<Task[]> {
+  const docs = await collection()
+    .find({ userId, deletedAt: null, completedAt: null, $text: { $search: query } })
     .limit(limit)
     .toArray()
   return docs.map(fromDocument)

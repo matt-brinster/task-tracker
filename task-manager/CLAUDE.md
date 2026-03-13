@@ -25,15 +25,18 @@ npm test -- --run  # run tests once and exit
 ## Project Status
 
 **Phase 1: Core Domain Modeling** — complete.
-**Phase 3: Persistence** — in progress (jumping ahead of Phase 2).
+**Phase 3: Persistence** — complete.
+**Phase 2: REST API Layer** — not started.
 
 Completed:
 - `src/domain/task.ts` — `Task` type and `createTask` factory (uses UUIDv7 for IDs)
-- `src/domain/task_operations.ts` — `completeTask`, `reopenTask`, `snoozeTask`, `wakeTask`, `deleteTask`, `addBlockers`, `removeBlockers`
+- `src/domain/task_operations.ts` — `completeTask`, `reopenTask`, `snoozeTask`, `wakeTask`, `deleteTask`, `addBlockers`, `removeBlockers`, `setQueue`
 - `src/domain/task_operations.test.ts` — full test coverage for all operations above
-- `src/domain/user.ts` — `User` type (id, email; no operations)
+- `src/domain/user.ts` — `User` type and `createUser` factory (UUIDv7 IDs, lowercases/trims email)
 - `src/repository/client.ts` — MongoDB client and `db()` helper
-- `src/repository/task_repository.ts` — `insertTask`, `updateTask(old, updated)`, `findTaskById(userId, taskId)`, `findOpenTasks(userId, limit?)`, document mapping (`toDocument`/`fromDocument`). Uses `task.id` as MongoDB `_id`. Queries filter out soft-deleted records by default.
+- `src/repository/task_repository.ts` — `insertTask`, `updateTask(old, updated)`, `findTaskById(userId, taskId)`, `findOpenTasks(userId, limit?)`, `searchTasks(userId, query, limit?)`, document mapping (`toDocument`/`fromDocument`). Uses `task.id` as MongoDB `_id`. Queries filter out soft-deleted records by default. Text search also excludes completed tasks.
+- `src/repository/user_repository.ts` — `insertUser`, `findUserById`, `findUserByEmail`
+- `src/repository/indexes.ts` — `ensureIndexes()`: compound index on tasks (`userId`, `deletedAt`, `completedAt`), unique index on `users.email`, text index on tasks (`userId` prefix, `title` weight 2, `details` weight 1)
 
 See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
 

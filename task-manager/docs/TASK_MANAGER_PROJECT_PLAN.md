@@ -10,7 +10,7 @@ Also serves as a learning vehicle for strengthening JavaScript and TypeScript sk
 ### User
 A user has:
 - **id:** GUID
-- **emails:** strings
+- **email:** string
 
 Credentials (session tokens, verification tokens) are an infrastructure concern, not modeled in the domain. User provisioning is manual — the admin inserts rows directly into the DB.
 
@@ -103,10 +103,12 @@ A DB gateway abstracts all storage. The rest of the app works only with domain t
 - MongoDB integration
 - Repository layer implementing the DB gateway interface
 - Indexes — add alongside queries as access patterns solidify. Likely candidates:
-  - `{ userId: 1, completedAt: 1 }` — primary query: user's incomplete tasks
-  - `{ userId: 1, snoozedUntil: 1 }` — snoozed task queries
-  - `{ title: "text", details: "text" }` — full-text search (one text index per collection; weight title higher)
+  - `{ userId: 1, deletedAt: 1, completedAt: 1 }` — primary query: user's incomplete tasks ✅
+  - `{ email: 1 }` unique — user lookup by email ✅
+  - `{ userId: 1, title: "text", details: "text" }` — full-text search (userId prefix, title weight 2, details weight 1) ✅
   - TTL index on `pending_verifications.expiresAt` — automatic magic link cleanup
+- `ensureIndexes()` uses `createIndex` which is a no-op for identical definitions but errors if the name matches with a different definition. Changing an index shape requires dropping the old one first. Need a migration strategy for production (deferred).
+- **End-to-end test needed:** duplicate email rejection (requires `ensureIndexes()` to have run)
 - **Learning focus:** async I/O, MongoDB driver, document modeling, indexing
 
 ### Phase 4: Snooze/Timer Mechanics

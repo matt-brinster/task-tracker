@@ -3,12 +3,14 @@ import { client } from './client.js'
 import { db } from './client.js'
 import { createTask } from '../domain/task.js'
 import { completeTask, deleteTask, snoozeTask } from '../domain/task_operations.js'
-import { insertTask, updateTask, findTaskById, findOpenTasks, fromDocument } from './task_repository.js'
+import { insertTask, updateTask, findTaskById, findOpenTasks, searchTasks, fromDocument } from './task_repository.js'
+import { ensureIndexes } from './indexes.js'
 import type { TaskDocument } from './task_repository.js'
 
 describe('task repository', () => {
   beforeAll(async () => {
     await client.connect()
+    await ensureIndexes()
   })
 
   afterEach(async () => {
@@ -204,6 +206,68 @@ describe('task repository', () => {
       const restored = fromDocument(doc!)
 
       expect(restored).toEqual(task)
+    })
+  })
+
+  describe('searchTasks', () => {
+    it('finds tasks matching a word in the title', async () => {
+      await insertTask(createTask('user-1', 'Buy groceries'))
+      await insertTask(createTask('user-1', 'Walk the dog'))
+
+      const results = await searchTasks('user-1', 'groceries')
+      expect(results).toHaveLength(1)
+      expect(results[0]!.title).toBe('Buy groceries')
+    })
+
+    it('finds tasks matching a word in the details', async () => {
+      await insertTask(createTask('user-1', 'Errand', 'pick up milk from the store'))
+
+      const results = await searchTasks('user-1', 'milk')
+      expect(results).toHaveLength(1)
+      expect(results[0]!.title).toBe('Errand')
+    })
+
+    it('excludes tasks belonging to other users', async () => {
+      await insertTask(createTask('user-1', 'Buy milk'))
+      await insertTask(createTask('user-2', 'Buy milk'))
+
+      const results = await searchTasks('user-1', 'milk')
+      expect(results).toHaveLength(1)
+      expect(results[0]!.userId).toBe('user-1')
+    })
+
+    it('excludes completed tasks', async () => {
+      const task = createTask('user-1', 'Buy milk')
+      await insertTask(task)
+      await updateTask(task, completeTask(task, new Date()))
+
+      const results = await searchTasks('user-1', 'milk')
+      expect(results).toHaveLength(0)
+    })
+
+    it('excludes soft-deleted tasks', async () => {
+      const task = createTask('user-1', 'Buy milk')
+      await insertTask(task)
+      await updateTask(task, deleteTask(task, new Date()))
+
+      const results = await searchTasks('user-1', 'milk')
+      expect(results).toHaveLength(0)
+    })
+
+    it('returns an empty array when nothing matches', async () => {
+      await insertTask(createTask('user-1', 'Buy milk'))
+
+      const results = await searchTasks('user-1', 'zebra')
+      expect(results).toHaveLength(0)
+    })
+
+    it('respects the limit parameter', async () => {
+      await insertTask(createTask('user-1', 'Buy milk'))
+      await insertTask(createTask('user-1', 'Buy eggs'))
+      await insertTask(createTask('user-1', 'Buy bread'))
+
+      const results = await searchTasks('user-1', 'buy', 2)
+      expect(results).toHaveLength(2)
     })
   })
 })

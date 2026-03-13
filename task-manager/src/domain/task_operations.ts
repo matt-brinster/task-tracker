@@ -1,4 +1,4 @@
-import type { Task, Blocker } from './task.js'
+import type { Task, Blocker, Queue } from './task.js'
 
 export function completeTask(task: Task, at: Date): Task {
   return { ...task, completedAt: at }
@@ -30,4 +30,8 @@ export function addBlockers(task: Task, blockers: Blocker[]): Task {
 
 export function removeBlockers(task: Task, blockerIds: Set<string>): Task {
   return { ...task, blockers: task.blockers.filter(b => !blockerIds.has(b.id)) }
+}
+
+export function setQueue(task: Task, queue: Queue): Task {
+  return { ...task, queue }
 }
