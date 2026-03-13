@@ -116,7 +116,7 @@ Completed endpoints:
 Remaining endpoints:
 - `POST /tasks/:id/blockers` — add blockers
 - `DELETE /tasks/:id/blockers/:blockerId` — remove a blocker
-- `GET /tasks/search?q=...` — text search
+- `GET /tasks/open/search?q=...` — text search (open tasks only) ✅
 
 ### Phase 3: Persistence
 - MongoDB integration

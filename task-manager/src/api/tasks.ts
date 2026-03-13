@@ -3,7 +3,7 @@ import type { Task } from '../domain/task.js'
 import { createTask } from '../domain/task.js'
 import type { Queue } from '../domain/task.js'
 import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, setQueue } from '../domain/task_operations.js'
-import { findOpenTasks, findTaskById, insertTask, updateTask } from '../repository/task_repository.js'
+import { findOpenTasks, findTaskById, insertTask, updateTask, searchTasks } from '../repository/task_repository.js'
 
 function toTaskResponse(task: Task) {
   return {
@@ -45,6 +45,16 @@ taskRouter.post('/', async (req, res) => {
   const task = createTask(req.userId, title, details, queue as Queue | undefined)
   await insertTask(task)
   res.status(201).json(toTaskResponse(task))
+})
+
+taskRouter.get('/open/search', async (req, res) => {
+  const q = req.query.q
+  if (typeof q !== 'string' || q.trim() === '') {
+    res.status(400).json({ error: 'q query parameter is required' })
+    return
+  }
+  const tasks = await searchTasks(req.userId, q.trim())
+  res.json(tasks.map(toTaskResponse))
 })
 
 taskRouter.get('/:id', async (req, res) => {
