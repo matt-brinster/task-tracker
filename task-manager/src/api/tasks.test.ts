@@ -4,7 +4,7 @@ import app from './app.js'
 import { client, db } from '../repository/client.js'
 import { ensureIndexes } from '../repository/indexes.js'
 import { createTask } from '../domain/task.js'
-import { deleteTask } from '../domain/task_operations.js'
+import { completeTask, deleteTask, snoozeTask } from '../domain/task_operations.js'
 import { insertTask, updateTask } from '../repository/task_repository.js'
 
 beforeAll(async () => {
@@ -347,6 +347,217 @@ describe('POST /tasks/:id/complete', () => {
     const res = await request(app)
       .post(`/tasks/${task.id}/complete`)
       .set('X-User-Id', 'user-2')
+
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('POST /tasks/:id/reopen', () => {
+  it('reopens a completed task', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+    await updateTask(task, completeTask(task, new Date()))
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/reopen`)
+      .set('X-User-Id', 'user-1')
+
+    expect(res.status).toBe(200)
+    expect(res.body.completedAt).toBeNull()
+  })
+
+  it('returns the task to GET /tasks/open', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+    await updateTask(task, completeTask(task, new Date()))
+
+    await request(app)
+      .post(`/tasks/${task.id}/reopen`)
+      .set('X-User-Id', 'user-1')
+
+    const listRes = await request(app)
+      .get('/tasks/open')
+      .set('X-User-Id', 'user-1')
+
+    expect(listRes.body).toHaveLength(1)
+    expect(listRes.body[0].title).toBe('Buy milk')
+  })
+
+  it('returns 404 when the task does not exist', async () => {
+    const res = await request(app)
+      .post('/tasks/nonexistent-id/reopen')
+      .set('X-User-Id', 'user-1')
+
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('POST /tasks/:id/snooze', () => {
+  it('snoozes a task until the given date', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/snooze`)
+      .set('X-User-Id', 'user-1')
+      .send({ until: '2026-04-01T12:00:00Z' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.snoozedUntil).toBe('2026-04-01T12:00:00.000Z')
+  })
+
+  it('persists the snooze', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    await request(app)
+      .post(`/tasks/${task.id}/snooze`)
+      .set('X-User-Id', 'user-1')
+      .send({ until: '2026-04-01T12:00:00Z' })
+
+    const getRes = await request(app)
+      .get(`/tasks/${task.id}`)
+      .set('X-User-Id', 'user-1')
+
+    expect(getRes.body.snoozedUntil).toBe('2026-04-01T12:00:00.000Z')
+  })
+
+  it('returns 400 when until is missing', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/snooze`)
+      .set('X-User-Id', 'user-1')
+      .send({})
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/until is required/)
+  })
+
+  it('returns 400 for an invalid date', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/snooze`)
+      .set('X-User-Id', 'user-1')
+      .send({ until: 'not-a-date' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/valid ISO 8601/)
+  })
+
+  it('returns 404 when the task does not exist', async () => {
+    const res = await request(app)
+      .post('/tasks/nonexistent-id/snooze')
+      .set('X-User-Id', 'user-1')
+      .send({ until: '2026-04-01T12:00:00Z' })
+
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('POST /tasks/:id/wake', () => {
+  it('clears snoozedUntil on a snoozed task', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+    await updateTask(task, snoozeTask(task, new Date('2026-04-01T12:00:00Z')))
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/wake`)
+      .set('X-User-Id', 'user-1')
+
+    expect(res.status).toBe(200)
+    expect(res.body.snoozedUntil).toBeNull()
+  })
+
+  it('persists the wake', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+    await updateTask(task, snoozeTask(task, new Date('2026-04-01T12:00:00Z')))
+
+    await request(app)
+      .post(`/tasks/${task.id}/wake`)
+      .set('X-User-Id', 'user-1')
+
+    const getRes = await request(app)
+      .get(`/tasks/${task.id}`)
+      .set('X-User-Id', 'user-1')
+
+    expect(getRes.body.snoozedUntil).toBeNull()
+  })
+
+  it('returns 404 when the task does not exist', async () => {
+    const res = await request(app)
+      .post('/tasks/nonexistent-id/wake')
+      .set('X-User-Id', 'user-1')
+
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('POST /tasks/:id/queue', () => {
+  it('moves a task to backlog', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/queue`)
+      .set('X-User-Id', 'user-1')
+      .send({ queue: 'backlog' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.queue).toBe('backlog')
+  })
+
+  it('moves a task back to todo', async () => {
+    const task = createTask('user-1', 'Buy milk', '', 'backlog')
+    await insertTask(task)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/queue`)
+      .set('X-User-Id', 'user-1')
+      .send({ queue: 'todo' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.queue).toBe('todo')
+  })
+
+  it('persists the queue change', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    await request(app)
+      .post(`/tasks/${task.id}/queue`)
+      .set('X-User-Id', 'user-1')
+      .send({ queue: 'backlog' })
+
+    const getRes = await request(app)
+      .get(`/tasks/${task.id}`)
+      .set('X-User-Id', 'user-1')
+
+    expect(getRes.body.queue).toBe('backlog')
+  })
+
+  it('returns 400 for invalid queue value', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/queue`)
+      .set('X-User-Id', 'user-1')
+      .send({ queue: 'urgent' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('queue must be "todo" or "backlog"')
+  })
+
+  it('returns 404 when the task does not exist', async () => {
+    const res = await request(app)
+      .post('/tasks/nonexistent-id/queue')
+      .set('X-User-Id', 'user-1')
+      .send({ queue: 'backlog' })
 
     expect(res.status).toBe(404)
   })

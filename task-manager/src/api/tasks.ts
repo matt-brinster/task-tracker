@@ -2,7 +2,7 @@ import { Router } from 'express'
 import type { Task } from '../domain/task.js'
 import { createTask } from '../domain/task.js'
 import type { Queue } from '../domain/task.js'
-import { completeTask, deleteTask } from '../domain/task_operations.js'
+import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, setQueue } from '../domain/task_operations.js'
 import { findOpenTasks, findTaskById, insertTask, updateTask } from '../repository/task_repository.js'
 
 function toTaskResponse(task: Task) {
@@ -76,4 +76,67 @@ taskRouter.post('/:id/complete', async (req, res) => {
   const completed = completeTask(task, new Date())
   await updateTask(task, completed)
   res.json(toTaskResponse(completed))
+})
+
+taskRouter.post('/:id/reopen', async (req, res) => {
+  const task = await findTaskById(req.userId, req.params.id)
+  if (!task) {
+    res.status(404).json({ error: 'Task not found' })
+    return
+  }
+  const reopened = reopenTask(task)
+  await updateTask(task, reopened)
+  res.json(toTaskResponse(reopened))
+})
+
+taskRouter.post('/:id/snooze', async (req, res) => {
+  const task = await findTaskById(req.userId, req.params.id)
+  if (!task) {
+    res.status(404).json({ error: 'Task not found' })
+    return
+  }
+
+  const { until } = req.body
+  if (typeof until !== 'string') {
+    res.status(400).json({ error: 'until is required (ISO 8601 date string)' })
+    return
+  }
+  const date = new Date(until)
+  if (isNaN(date.getTime())) {
+    res.status(400).json({ error: 'until must be a valid ISO 8601 date string' })
+    return
+  }
+
+  const snoozed = snoozeTask(task, date)
+  await updateTask(task, snoozed)
+  res.json(toTaskResponse(snoozed))
+})
+
+taskRouter.post('/:id/wake', async (req, res) => {
+  const task = await findTaskById(req.userId, req.params.id)
+  if (!task) {
+    res.status(404).json({ error: 'Task not found' })
+    return
+  }
+  const woken = wakeTask(task)
+  await updateTask(task, woken)
+  res.json(toTaskResponse(woken))
+})
+
+taskRouter.post('/:id/queue', async (req, res) => {
+  const task = await findTaskById(req.userId, req.params.id)
+  if (!task) {
+    res.status(404).json({ error: 'Task not found' })
+    return
+  }
+
+  const { queue } = req.body
+  if (queue !== 'todo' && queue !== 'backlog') {
+    res.status(400).json({ error: 'queue must be "todo" or "backlog"' })
+    return
+  }
+
+  const updated = setQueue(task, queue)
+  await updateTask(task, updated)
+  res.json(toTaskResponse(updated))
 })
