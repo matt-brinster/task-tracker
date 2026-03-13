@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import type { Task } from '../domain/task.js'
-import { findOpenTasks } from '../repository/task_repository.js'
+import { findOpenTasks, findTaskById } from '../repository/task_repository.js'
 
 function toTaskResponse(task: Task) {
   return {
@@ -16,7 +16,16 @@ function toTaskResponse(task: Task) {
 
 export const taskRouter = Router()
 
-taskRouter.get('/', async (req, res) => {
+taskRouter.get('/open', async (req, res) => {
   const tasks = await findOpenTasks(req.userId)
   res.json(tasks.map(toTaskResponse))
+})
+
+taskRouter.get('/:id', async (req, res) => {
+  const task = await findTaskById(req.userId, req.params.id)
+  if (!task) {
+    res.status(404).json({ error: 'Task not found' })
+    return
+  }
+  res.json(toTaskResponse(task))
 })
