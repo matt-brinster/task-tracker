@@ -136,3 +136,92 @@ describe('GET /tasks/:id', () => {
     expect(res.body).not.toHaveProperty('deletedAt')
   })
 })
+
+describe('POST /tasks', () => {
+  it('creates a task with just a title', async () => {
+    const res = await request(app)
+      .post('/tasks')
+      .set('X-User-Id', 'user-1')
+      .send({ title: 'Buy milk' })
+
+    expect(res.status).toBe(201)
+    expect(res.body.id).toBeDefined()
+    expect(res.body.title).toBe('Buy milk')
+    expect(res.body.details).toBe('')
+    expect(res.body.queue).toBe('todo')
+  })
+
+  it('creates a task with details and queue', async () => {
+    const res = await request(app)
+      .post('/tasks')
+      .set('X-User-Id', 'user-1')
+      .send({ title: 'Sort backlog', details: 'review priorities', queue: 'backlog' })
+
+    expect(res.status).toBe(201)
+    expect(res.body.details).toBe('review priorities')
+    expect(res.body.queue).toBe('backlog')
+  })
+
+  it('persists the task to the database', async () => {
+    const res = await request(app)
+      .post('/tasks')
+      .set('X-User-Id', 'user-1')
+      .send({ title: 'Buy milk' })
+
+    const getRes = await request(app)
+      .get(`/tasks/${res.body.id}`)
+      .set('X-User-Id', 'user-1')
+
+    expect(getRes.status).toBe(200)
+    expect(getRes.body.title).toBe('Buy milk')
+  })
+
+  it('trims whitespace from the title', async () => {
+    const res = await request(app)
+      .post('/tasks')
+      .set('X-User-Id', 'user-1')
+      .send({ title: '  Buy milk  ' })
+
+    expect(res.body.title).toBe('Buy milk')
+  })
+
+  it('returns 400 when title is missing', async () => {
+    const res = await request(app)
+      .post('/tasks')
+      .set('X-User-Id', 'user-1')
+      .send({})
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('title is required')
+  })
+
+  it('returns 400 when title is empty', async () => {
+    const res = await request(app)
+      .post('/tasks')
+      .set('X-User-Id', 'user-1')
+      .send({ title: '   ' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('title is required')
+  })
+
+  it('returns 400 for invalid queue value', async () => {
+    const res = await request(app)
+      .post('/tasks')
+      .set('X-User-Id', 'user-1')
+      .send({ title: 'Buy milk', queue: 'urgent' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('queue must be "todo" or "backlog"')
+  })
+
+  it('does not include userId or deletedAt in the response', async () => {
+    const res = await request(app)
+      .post('/tasks')
+      .set('X-User-Id', 'user-1')
+      .send({ title: 'Buy milk' })
+
+    expect(res.body).not.toHaveProperty('userId')
+    expect(res.body).not.toHaveProperty('deletedAt')
+  })
+})

@@ -1,6 +1,8 @@
 import { Router } from 'express'
 import type { Task } from '../domain/task.js'
-import { findOpenTasks, findTaskById } from '../repository/task_repository.js'
+import { createTask } from '../domain/task.js'
+import type { Queue } from '../domain/task.js'
+import { findOpenTasks, findTaskById, insertTask } from '../repository/task_repository.js'
 
 function toTaskResponse(task: Task) {
   return {
@@ -19,6 +21,29 @@ export const taskRouter = Router()
 taskRouter.get('/open', async (req, res) => {
   const tasks = await findOpenTasks(req.userId)
   res.json(tasks.map(toTaskResponse))
+})
+
+taskRouter.post('/', async (req, res) => {
+  const { title, details, queue } = req.body
+
+  if (typeof title !== 'string' || title.trim() === '') {
+    res.status(400).json({ error: 'title is required' })
+    return
+  }
+
+  if (details !== undefined && typeof details !== 'string') {
+    res.status(400).json({ error: 'details must be a string' })
+    return
+  }
+
+  if (queue !== undefined && queue !== 'todo' && queue !== 'backlog') {
+    res.status(400).json({ error: 'queue must be "todo" or "backlog"' })
+    return
+  }
+
+  const task = createTask(req.userId, title, details, queue as Queue | undefined)
+  await insertTask(task)
+  res.status(201).json(toTaskResponse(task))
 })
 
 taskRouter.get('/:id', async (req, res) => {
