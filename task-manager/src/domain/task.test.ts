@@ -19,7 +19,7 @@ describe('createTask', () => {
 
   it('defaults to no blockers', () => {
     const task = createTask('user-1', 'Buy milk')
-    expect(task.blockerIds).toEqual(new Set<string>())
+    expect(task.blockers).toEqual([])
   })
 
   it('completedAt is null on creation', () => {
@@ -42,14 +42,15 @@ describe('createTask', () => {
     expect(task.queue).toBe('backlog')
   })
 
-  it('accepts blocker IDs', () => {
-    const task = createTask('user-1', 'Buy milk', '', 'todo', new Set(['id-1', 'id-2']))
-    expect(task.blockerIds).toEqual(new Set(['id-1', 'id-2']))
+  it('accepts blockers', () => {
+    const blockers = [{ id: 'id-1', title: 'Task 1' }, { id: 'id-2', title: 'Task 2' }]
+    const task = createTask('user-1', 'Buy milk', '', 'todo', blockers)
+    expect(task.blockers).toEqual(blockers)
   })
 
   it('accepts a snoozedUntil date', () => {
     const date = new Date('2026-04-01')
-    const task = createTask('user-1', 'Buy milk', '', 'todo', new Set<string>(), date)
+    const task = createTask('user-1', 'Buy milk', '', 'todo', [], date)
     expect(task.snoozedUntil).toEqual(date)
   })
 

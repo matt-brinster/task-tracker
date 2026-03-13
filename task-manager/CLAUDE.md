@@ -29,10 +29,11 @@ npm test -- --run  # run tests once and exit
 
 Completed:
 - `src/domain/task.ts` — `Task` type and `createTask` factory (uses UUIDv7 for IDs)
-- `src/domain/task_operations.ts` — `completeTask`, `reopenTask`, `snoozeTask`, `wakeTask`, `addBlockerIds`, `removeBlockerIds`
+- `src/domain/task_operations.ts` — `completeTask`, `reopenTask`, `snoozeTask`, `wakeTask`, `deleteTask`, `addBlockers`, `removeBlockers`
 - `src/domain/task_operations.test.ts` — full test coverage for all operations above
 - `src/domain/user.ts` — `User` type (id, email; no operations)
 - `src/repository/client.ts` — MongoDB client and `db()` helper
+- `src/repository/task_repository.ts` — `insertTask`, `updateTask(old, updated)`, document mapping (`toDocument`/`fromDocument`). Uses `task.id` as MongoDB `_id`.
 
 See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
 
@@ -45,7 +46,9 @@ Layered architecture:
 
 There is **no state machine** and no derived "status" field. The domain exposes raw data; the API and UI decide how to present it. Domain predicates may be added as needed (e.g. `isComplete`, `isSnoozed`), but status display logic belongs to the presentation layer.
 
-**Blockers:** `blockerIds` is a set of task IDs. It is not automatically cleaned up when a blocking task completes. Stale blocker ID cleanup is deferred.
+**Soft deletes:** `deleteTask` sets `deletedAt` and scrubs `title`/`details` (PII removal). There is no restore. Deleted task documents remain for blocker reference integrity but are invisible to users.
+
+**Blockers:** `blockers` is a `Blocker[]` — denormalized `{ id, title }` pairs stored as an array (not a set) to allow future priority ranking. Blocker titles are not automatically updated if the source task's title changes. Stale blocker cleanup is deferred.
 
 Source lives in `src/`, compiled output goes to `dist/`. The TypeScript config uses `module: "nodenext"`, so imports require explicit `.js` extensions even for `.ts` source files (e.g. `import { foo } from './foo.js'`).
 

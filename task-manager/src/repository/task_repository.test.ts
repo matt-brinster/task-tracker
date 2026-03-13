@@ -33,21 +33,22 @@ describe('task repository', () => {
       expect(doc!.queue).toBe('todo')
       expect(doc!.completedAt).toBeNull()
       expect(doc!.snoozedUntil).toBeNull()
-      expect(doc!.blockerIds).toEqual([])
+      expect(doc!.blockers).toEqual([])
     })
 
-    it('stores blockerIds as an array', async () => {
-      const task = createTask('user-1', 'Deploy', '', 'todo', new Set(['blocker-1', 'blocker-2']))
+    it('stores blockers as an array of objects', async () => {
+      const blockers = [{ id: 'blocker-1', title: 'Task A' }, { id: 'blocker-2', title: 'Task B' }]
+      const task = createTask('user-1', 'Deploy', '', 'todo', blockers)
       await insertTask(task)
 
       const doc = await db().collection<TaskDocument>('tasks').findOne({ _id: task.id })
-      expect(doc!.blockerIds).toEqual(expect.arrayContaining(['blocker-1', 'blocker-2']))
-      expect(doc!.blockerIds).toHaveLength(2)
+      expect(doc!.blockers).toEqual(blockers)
+      expect(doc!.blockers).toHaveLength(2)
     })
 
     it('stores snoozedUntil as a Date', async () => {
       const snoozeDate = new Date('2026-04-01T12:00:00Z')
-      const task = createTask('user-1', 'Later', '', 'todo', null, snoozeDate)
+      const task = createTask('user-1', 'Later', '', 'todo', [], snoozeDate)
       await insertTask(task)
 
       const doc = await db().collection<TaskDocument>('tasks').findOne({ _id: task.id })
@@ -101,7 +102,7 @@ describe('task repository', () => {
 
   describe('fromDocument', () => {
     it('round-trips a task through document conversion', async () => {
-      const task = createTask('user-1', 'Round trip', 'some details', 'backlog', new Set(['b1']))
+      const task = createTask('user-1', 'Round trip', 'some details', 'backlog', [{ id: 'b1', title: 'Blocker' }])
       await insertTask(task)
 
       const doc = await db().collection<TaskDocument>('tasks').findOne({ _id: task.id })

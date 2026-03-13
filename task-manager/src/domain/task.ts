@@ -2,6 +2,11 @@ import { v7 as uuidv7 } from 'uuid'
 
 export type Queue = 'todo' | 'backlog'
 
+export type Blocker = {
+  id: string
+  title: string
+}
+
 export type Task = {
   id: string
   userId: string
@@ -11,10 +16,10 @@ export type Task = {
   completedAt: Date | null
   snoozedUntil: Date | null
   deletedAt: Date | null
-  blockerIds: Set<string>  // IDs of tasks that the user says will block this task
+  blockers: Blocker[]
 }
 
-export function createTask(userId: string, title: string, details: string = "", queue: Queue = 'todo', blockerIds: Set<string> | null = null, snoozedUntil: Date | null = null): Task {
+export function createTask(userId: string, title: string, details: string = "", queue: Queue = 'todo', blockers: Blocker[] = [], snoozedUntil: Date | null = null): Task {
   return {
     id: uuidv7(),
     userId,
@@ -24,6 +29,6 @@ export function createTask(userId: string, title: string, details: string = "", 
     completedAt: null,
     snoozedUntil,
     deletedAt: null,
-    blockerIds: blockerIds ?? new Set()
+    blockers: [...blockers],
   }
 }

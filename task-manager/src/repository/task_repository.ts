@@ -1,5 +1,6 @@
 import type { Collection } from 'mongodb'
-import type { Task, Queue } from '../domain/task.js'
+import type { Task, Queue, Blocker } from '../domain/task.js'
+
 import { db } from './client.js'
 
 /** The shape of a task document in MongoDB. */
@@ -12,7 +13,7 @@ export type TaskDocument = {
   completedAt: Date | null
   snoozedUntil: Date | null
   deletedAt: Date | null
-  blockerIds: string[]
+  blockers: Blocker[]
 }
 
 function toDocument(task: Task): TaskDocument {
@@ -25,7 +26,7 @@ function toDocument(task: Task): TaskDocument {
     completedAt: task.completedAt,
     snoozedUntil: task.snoozedUntil,
     deletedAt: task.deletedAt,
-    blockerIds: [...task.blockerIds],
+    blockers: [...task.blockers],
   }
 }
 
@@ -39,7 +40,7 @@ export function fromDocument(doc: TaskDocument): Task {
     completedAt: doc.completedAt,
     snoozedUntil: doc.snoozedUntil,
     deletedAt: doc.deletedAt,
-    blockerIds: new Set(doc.blockerIds),
+    blockers: [...doc.blockers],
   }
 }
 

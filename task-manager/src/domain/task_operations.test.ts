@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { createTask } from './task.js'
-import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, addBlockerIds, removeBlockerIds } from './task_operations.js'
+import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, addBlockers, removeBlockers } from './task_operations.js'
+
+const blocker1 = { id: 'id-1', title: 'Blocker 1' }
+const blocker2 = { id: 'id-2', title: 'Blocker 2' }
+const blocker3 = { id: 'id-3', title: 'Blocker 3' }
 
 describe('completeTask', () => {
   it('sets completedAt to the provided date', () => {
@@ -17,7 +21,7 @@ describe('completeTask', () => {
   })
 
   it('preserves all other fields', () => {
-    const task = createTask('user-1', 'Buy milk', 'from the shop', 'backlog', new Set(['id-1']))
+    const task = createTask('user-1', 'Buy milk', 'from the shop', 'backlog', [blocker1])
     const now = new Date('2026-03-10T12:00:00Z')
     const result = completeTask(task, now)
     expect(result.id).toBe(task.id)
@@ -25,7 +29,7 @@ describe('completeTask', () => {
     expect(result.details).toBe(task.details)
     expect(result.queue).toBe(task.queue)
     expect(result.snoozedUntil).toBe(task.snoozedUntil)
-    expect(result.blockerIds).toEqual(task.blockerIds)
+    expect(result.blockers).toEqual(task.blockers)
   })
 
   it('can complete an already-completed task (updates the timestamp)', () => {
@@ -51,7 +55,7 @@ describe('reopenTask', () => {
   })
 
   it('preserves all other fields', () => {
-    const task = createTask('user-1', 'Buy milk', 'from the shop', 'backlog', new Set(['id-1']))
+    const task = createTask('user-1', 'Buy milk', 'from the shop', 'backlog', [blocker1])
     const completed = completeTask(task, new Date())
     const result = reopenTask(completed)
     expect(result.id).toBe(task.id)
@@ -59,7 +63,7 @@ describe('reopenTask', () => {
     expect(result.details).toBe(task.details)
     expect(result.queue).toBe(task.queue)
     expect(result.snoozedUntil).toBe(task.snoozedUntil)
-    expect(result.blockerIds).toEqual(task.blockerIds)
+    expect(result.blockers).toEqual(task.blockers)
   })
 
   it('is a no-op on a task that is not completed', () => {
@@ -84,14 +88,14 @@ describe('snoozeTask', () => {
   })
 
   it('preserves all other fields', () => {
-    const task = createTask('user-1', 'Buy milk', 'from the shop', 'backlog', new Set(['id-1']))
+    const task = createTask('user-1', 'Buy milk', 'from the shop', 'backlog', [blocker1])
     const result = snoozeTask(task, new Date('2026-03-15T09:00:00Z'))
     expect(result.id).toBe(task.id)
     expect(result.title).toBe(task.title)
     expect(result.details).toBe(task.details)
     expect(result.queue).toBe(task.queue)
     expect(result.completedAt).toBe(task.completedAt)
-    expect(result.blockerIds).toEqual(task.blockerIds)
+    expect(result.blockers).toEqual(task.blockers)
   })
 
   it('can update the snooze date on an already-snoozed task', () => {
@@ -145,51 +149,51 @@ describe('deleteTask', () => {
   })
 
   it('preserves all other fields', () => {
-    const task = createTask('user-1', 'Buy milk', 'from the shop', 'backlog', new Set(['id-1']))
+    const task = createTask('user-1', 'Buy milk', 'from the shop', 'backlog', [blocker1])
     const now = new Date('2026-03-10T12:00:00Z')
     const result = deleteTask(task, now)
     expect(result.id).toBe(task.id)
     expect(result.queue).toBe(task.queue)
     expect(result.completedAt).toBe(task.completedAt)
     expect(result.snoozedUntil).toBe(task.snoozedUntil)
-    expect(result.blockerIds).toEqual(task.blockerIds)
+    expect(result.blockers).toEqual(task.blockers)
   })
 })
 
-describe('addBlockerIds', () => {
-  it('adds blocker IDs to an empty set', () => {
+describe('addBlockers', () => {
+  it('adds blockers to an empty array', () => {
     const task = createTask('user-1', 'Buy bread')
-    const result = addBlockerIds(task, new Set(['abc123']))
-    expect(result.blockerIds).toEqual(new Set(['abc123']))
+    const result = addBlockers(task, [blocker1])
+    expect(result.blockers).toEqual([blocker1])
   })
 
-  it('merges with existing blocker IDs', () => {
-    const task = createTask('user-1', 'Buy bread', '', 'todo', new Set(['existing']))
-    const result = addBlockerIds(task, new Set(['new1', 'new2']))
-    expect(result.blockerIds).toEqual(new Set(['existing', 'new1', 'new2']))
+  it('appends to existing blockers', () => {
+    const task = createTask('user-1', 'Buy bread', '', 'todo', [blocker1])
+    const result = addBlockers(task, [blocker2, blocker3])
+    expect(result.blockers).toEqual([blocker1, blocker2, blocker3])
   })
 
-  it('deduplicates IDs already present', () => {
-    const task = createTask('user-1', 'Buy bread', '', 'todo', new Set(['abc123']))
-    const result = addBlockerIds(task, new Set(['abc123']))
-    expect(result.blockerIds).toEqual(new Set(['abc123']))
+  it('deduplicates by id', () => {
+    const task = createTask('user-1', 'Buy bread', '', 'todo', [blocker1])
+    const result = addBlockers(task, [blocker1])
+    expect(result.blockers).toEqual([blocker1])
   })
 
-  it('is a no-op with an empty set', () => {
-    const task = createTask('user-1', 'Buy bread', '', 'todo', new Set(['abc123']))
-    const result = addBlockerIds(task, new Set())
-    expect(result.blockerIds).toEqual(new Set(['abc123']))
+  it('is a no-op with an empty array', () => {
+    const task = createTask('user-1', 'Buy bread', '', 'todo', [blocker1])
+    const result = addBlockers(task, [])
+    expect(result.blockers).toEqual([blocker1])
   })
 
   it('does not mutate the original task', () => {
     const task = createTask('user-1', 'Buy bread')
-    addBlockerIds(task, new Set(['abc123']))
-    expect(task.blockerIds).toEqual(new Set())
+    addBlockers(task, [blocker1])
+    expect(task.blockers).toEqual([])
   })
 
   it('preserves all other fields', () => {
     const task = createTask('user-1', 'Buy bread', 'from the bakery', 'backlog')
-    const result = addBlockerIds(task, new Set(['abc123']))
+    const result = addBlockers(task, [blocker1])
     expect(result.id).toBe(task.id)
     expect(result.title).toBe(task.title)
     expect(result.details).toBe(task.details)
@@ -199,40 +203,40 @@ describe('addBlockerIds', () => {
   })
 })
 
-describe('removeBlockerIds', () => {
-  it('removes a blocker ID', () => {
-    const task = createTask('user-1', 'Buy bread', '', 'todo', new Set(['abc123']))
-    const result = removeBlockerIds(task, new Set(['abc123']))
-    expect(result.blockerIds).toEqual(new Set())
+describe('removeBlockers', () => {
+  it('removes a blocker by id', () => {
+    const task = createTask('user-1', 'Buy bread', '', 'todo', [blocker1])
+    const result = removeBlockers(task, new Set(['id-1']))
+    expect(result.blockers).toEqual([])
   })
 
-  it('removes only the specified IDs, leaving others', () => {
-    const task = createTask('user-1', 'Buy bread', '', 'todo', new Set(['a', 'b', 'c']))
-    const result = removeBlockerIds(task, new Set(['a', 'c']))
-    expect(result.blockerIds).toEqual(new Set(['b']))
+  it('removes only the specified ids, leaving others', () => {
+    const task = createTask('user-1', 'Buy bread', '', 'todo', [blocker1, blocker2, blocker3])
+    const result = removeBlockers(task, new Set(['id-1', 'id-3']))
+    expect(result.blockers).toEqual([blocker2])
   })
 
-  it('is a no-op when the ID is not present', () => {
-    const task = createTask('user-1', 'Buy bread', '', 'todo', new Set(['abc123']))
-    const result = removeBlockerIds(task, new Set(['unknown']))
-    expect(result.blockerIds).toEqual(new Set(['abc123']))
+  it('is a no-op when the id is not present', () => {
+    const task = createTask('user-1', 'Buy bread', '', 'todo', [blocker1])
+    const result = removeBlockers(task, new Set(['unknown']))
+    expect(result.blockers).toEqual([blocker1])
   })
 
   it('is a no-op with an empty set', () => {
-    const task = createTask('user-1', 'Buy bread', '', 'todo', new Set(['abc123']))
-    const result = removeBlockerIds(task, new Set())
-    expect(result.blockerIds).toEqual(new Set(['abc123']))
+    const task = createTask('user-1', 'Buy bread', '', 'todo', [blocker1])
+    const result = removeBlockers(task, new Set())
+    expect(result.blockers).toEqual([blocker1])
   })
 
   it('does not mutate the original task', () => {
-    const task = createTask('user-1', 'Buy bread', '', 'todo', new Set(['abc123']))
-    removeBlockerIds(task, new Set(['abc123']))
-    expect(task.blockerIds).toEqual(new Set(['abc123']))
+    const task = createTask('user-1', 'Buy bread', '', 'todo', [blocker1])
+    removeBlockers(task, new Set(['id-1']))
+    expect(task.blockers).toEqual([blocker1])
   })
 
   it('preserves all other fields', () => {
-    const task = createTask('user-1', 'Buy bread', 'from the bakery', 'backlog', new Set(['abc123']))
-    const result = removeBlockerIds(task, new Set(['abc123']))
+    const task = createTask('user-1', 'Buy bread', 'from the bakery', 'backlog', [blocker1])
+    const result = removeBlockers(task, new Set(['id-1']))
     expect(result.id).toBe(task.id)
     expect(result.title).toBe(task.title)
     expect(result.details).toBe(task.details)

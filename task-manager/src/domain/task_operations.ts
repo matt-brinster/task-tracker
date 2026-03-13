@@ -1,4 +1,4 @@
-import type { Task } from './task.js'
+import type { Task, Blocker } from './task.js'
 
 export function completeTask(task: Task, at: Date): Task {
   return { ...task, completedAt: at }
@@ -22,10 +22,12 @@ export function deleteTask(task: Task, at: Date): Task {
   return { ...task, title: '', details: '', deletedAt: at }
 }
 
-export function addBlockerIds(task: Task, blockerIds: Set<string>): Task {
-  return { ...task, blockerIds: new Set([...task.blockerIds, ...blockerIds])};
+export function addBlockers(task: Task, blockers: Blocker[]): Task {
+  const existingIds = new Set(task.blockers.map(b => b.id))
+  const newBlockers = blockers.filter(b => !existingIds.has(b.id))
+  return { ...task, blockers: [...task.blockers, ...newBlockers] }
 }
 
-export function removeBlockerIds(task: Task, blockerIds: Set<string>): Task {
-  return { ...task, blockerIds: new Set([...task.blockerIds].filter(id => !blockerIds.has(id))) };
+export function removeBlockers(task: Task, blockerIds: Set<string>): Task {
+  return { ...task, blockers: task.blockers.filter(b => !blockerIds.has(b.id)) }
 }
