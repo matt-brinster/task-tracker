@@ -2,7 +2,8 @@ import { Router } from 'express'
 import type { Task } from '../domain/task.js'
 import { createTask } from '../domain/task.js'
 import type { Queue } from '../domain/task.js'
-import { findOpenTasks, findTaskById, insertTask } from '../repository/task_repository.js'
+import { deleteTask } from '../domain/task_operations.js'
+import { findOpenTasks, findTaskById, insertTask, updateTask } from '../repository/task_repository.js'
 
 function toTaskResponse(task: Task) {
   return {
@@ -53,4 +54,15 @@ taskRouter.get('/:id', async (req, res) => {
     return
   }
   res.json(toTaskResponse(task))
+})
+
+taskRouter.delete('/:id', async (req, res) => {
+  const task = await findTaskById(req.userId, req.params.id)
+  if (!task) {
+    res.status(404).json({ error: 'Task not found' })
+    return
+  }
+  const deleted = deleteTask(task, new Date())
+  await updateTask(task, deleted)
+  res.status(204).end()
 })

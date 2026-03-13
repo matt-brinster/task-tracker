@@ -225,3 +225,65 @@ describe('POST /tasks', () => {
     expect(res.body).not.toHaveProperty('deletedAt')
   })
 })
+
+describe('DELETE /tasks/:id', () => {
+  it('soft-deletes a task and returns 204', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .delete(`/tasks/${task.id}`)
+      .set('X-User-Id', 'user-1')
+
+    expect(res.status).toBe(204)
+  })
+
+  it('makes the task invisible to GET /tasks/:id', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    await request(app)
+      .delete(`/tasks/${task.id}`)
+      .set('X-User-Id', 'user-1')
+
+    const getRes = await request(app)
+      .get(`/tasks/${task.id}`)
+      .set('X-User-Id', 'user-1')
+
+    expect(getRes.status).toBe(404)
+  })
+
+  it('makes the task invisible to GET /tasks/open', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    await request(app)
+      .delete(`/tasks/${task.id}`)
+      .set('X-User-Id', 'user-1')
+
+    const listRes = await request(app)
+      .get('/tasks/open')
+      .set('X-User-Id', 'user-1')
+
+    expect(listRes.body).toEqual([])
+  })
+
+  it('returns 404 when the task does not exist', async () => {
+    const res = await request(app)
+      .delete('/tasks/nonexistent-id')
+      .set('X-User-Id', 'user-1')
+
+    expect(res.status).toBe(404)
+  })
+
+  it('returns 404 when the task belongs to a different user', async () => {
+    const task = createTask('user-1', 'Private task')
+    await insertTask(task)
+
+    const res = await request(app)
+      .delete(`/tasks/${task.id}`)
+      .set('X-User-Id', 'user-2')
+
+    expect(res.status).toBe(404)
+  })
+})
