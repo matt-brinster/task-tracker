@@ -103,13 +103,17 @@ A DB gateway abstracts all storage. The rest of the app works only with domain t
 - **Learning focus:** Node.js async patterns, middleware, request/response lifecycle
 
 Completed endpoints:
-- `GET /tasks` — list open tasks for the authenticated user ✅
+- `GET /tasks/open` — list open tasks for the authenticated user ✅
+- `POST /tasks` — create a task ✅
+- `GET /tasks/:id` — get a single task ✅
+- `DELETE /tasks/:id` — soft delete ✅
+- `POST /tasks/:id/complete` — mark task complete ✅
+- `POST /tasks/:id/reopen` — clear completedAt ✅
+- `POST /tasks/:id/snooze` — set snoozedUntil (body: `{ until }`) ✅
+- `POST /tasks/:id/wake` — clear snoozedUntil ✅
+- `POST /tasks/:id/queue` — set queue (body: `{ queue }`) ✅
 
 Remaining endpoints:
-- `POST /tasks` — create a task
-- `GET /tasks/:id` — get a single task
-- `PATCH /tasks/:id` — operations (complete, reopen, snooze, wake, set queue)
-- `DELETE /tasks/:id` — soft delete
 - `POST /tasks/:id/blockers` — add blockers
 - `DELETE /tasks/:id/blockers/:blockerId` — remove a blocker
 - `GET /tasks/search?q=...` — text search
