@@ -18,6 +18,10 @@ export function wakeTask(task: Task): Task {
   return { ...task, snoozedUntil: null }
 }
 
+export function deleteTask(task: Task, at: Date): Task {
+  return { ...task, title: '', details: '', deletedAt: at }
+}
+
 export function addBlockerIds(task: Task, blockerIds: Set<string>): Task {
   return { ...task, blockerIds: new Set([...task.blockerIds, ...blockerIds])};
 }

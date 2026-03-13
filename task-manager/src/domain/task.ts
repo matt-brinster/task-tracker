@@ -10,6 +10,7 @@ export type Task = {
   queue: Queue
   completedAt: Date | null
   snoozedUntil: Date | null
+  deletedAt: Date | null
   blockerIds: Set<string>  // IDs of tasks that the user says will block this task
 }
 
@@ -22,6 +23,7 @@ export function createTask(userId: string, title: string, details: string = "", 
     queue,
     completedAt: null,
     snoozedUntil,
+    deletedAt: null,
     blockerIds: blockerIds ?? new Set()
   }
 }

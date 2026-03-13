@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createTask } from './task.js'
-import { completeTask, reopenTask, snoozeTask, wakeTask, addBlockerIds, removeBlockerIds } from './task_operations.js'
+import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, addBlockerIds, removeBlockerIds } from './task_operations.js'
 
 describe('completeTask', () => {
   it('sets completedAt to the provided date', () => {
@@ -120,6 +120,39 @@ describe('wakeTask', () => {
     const task = createTask('user-1', 'Buy milk')
     const result = wakeTask(task)
     expect(result.snoozedUntil).toBeNull()
+  })
+})
+
+describe('deleteTask', () => {
+  it('sets deletedAt to the provided date', () => {
+    const task = createTask('user-1', 'Buy milk')
+    const now = new Date('2026-03-10T12:00:00Z')
+    const result = deleteTask(task, now)
+    expect(result.deletedAt).toEqual(now)
+  })
+
+  it('does not mutate the original task', () => {
+    const task = createTask('user-1', 'Buy milk')
+    deleteTask(task, new Date())
+    expect(task.deletedAt).toBeNull()
+  })
+
+  it('clears title and details to scrub PII', () => {
+    const task = createTask('user-1', 'Buy milk', 'from the shop')
+    const result = deleteTask(task, new Date('2026-03-10T12:00:00Z'))
+    expect(result.title).toBe('')
+    expect(result.details).toBe('')
+  })
+
+  it('preserves all other fields', () => {
+    const task = createTask('user-1', 'Buy milk', 'from the shop', 'backlog', new Set(['id-1']))
+    const now = new Date('2026-03-10T12:00:00Z')
+    const result = deleteTask(task, now)
+    expect(result.id).toBe(task.id)
+    expect(result.queue).toBe(task.queue)
+    expect(result.completedAt).toBe(task.completedAt)
+    expect(result.snoozedUntil).toBe(task.snoozedUntil)
+    expect(result.blockerIds).toEqual(task.blockerIds)
   })
 })
 

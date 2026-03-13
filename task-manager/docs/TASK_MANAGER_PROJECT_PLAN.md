@@ -93,12 +93,17 @@ A DB gateway abstracts all storage. The rest of the app works only with domain t
 - Routing, validation, error handling
 - Auth middleware (bearer token → session lookup → userId on request)
 - Request logging
+- Rate limiting: per-IP (unauthenticated) and per-user (authenticated)
 - **Learning focus:** Node.js async patterns, middleware, request/response lifecycle
 
 ### Phase 3: Persistence
 - MongoDB integration
 - Repository layer implementing the DB gateway interface
-- Indexes (userId, completedAt, TTL on pending_verifications)
+- Indexes — add alongside queries as access patterns solidify. Likely candidates:
+  - `{ userId: 1, completedAt: 1 }` — primary query: user's incomplete tasks
+  - `{ userId: 1, snoozedUntil: 1 }` — snoozed task queries
+  - `{ title: "text", details: "text" }` — full-text search (one text index per collection; weight title higher)
+  - TTL index on `pending_verifications.expiresAt` — automatic magic link cleanup
 - **Learning focus:** async I/O, MongoDB driver, document modeling, indexing
 
 ### Phase 4: Snooze/Timer Mechanics

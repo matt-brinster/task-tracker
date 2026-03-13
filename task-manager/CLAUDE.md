@@ -16,19 +16,23 @@ We are pair programming. The user is at the keyboard; Claude is the navigator. T
 ```bash
 npm run build      # compile TypeScript (outputs to dist/)
 npm run clean      # remove dist/
+npm test           # run tests (Vitest, watch mode); requires .env.test
+npm test -- --run  # run tests once and exit
 ```
 
-**Test framework: Vitest** (installed).
+**Test framework: Vitest.** Tests load `.env.test` via `node --env-file=.env.test`. Copy `.env.test.example` to `.env.test` to get started. Integration tests require MongoDB running (`docker compose up -d`).
 
 ## Project Status
 
-**Phase 1: Core Domain Modeling** — in progress.
+**Phase 1: Core Domain Modeling** — complete.
+**Phase 3: Persistence** — in progress (jumping ahead of Phase 2).
 
 Completed:
-- `src/domain/task.ts` — `Task` type and `createTask` factory
+- `src/domain/task.ts` — `Task` type and `createTask` factory (uses UUIDv7 for IDs)
 - `src/domain/task_operations.ts` — `completeTask`, `reopenTask`, `snoozeTask`, `wakeTask`, `addBlockerIds`, `removeBlockerIds`
 - `src/domain/task_operations.test.ts` — full test coverage for all operations above
 - `src/domain/user.ts` — `User` type (id, email; no operations)
+- `src/repository/client.ts` — MongoDB client and `db()` helper
 
 See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
 
