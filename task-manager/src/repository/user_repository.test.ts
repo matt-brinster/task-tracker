@@ -21,7 +21,7 @@ describe('user repository', () => {
       const user = createUser('alice@example.com')
       await insertUser(user)
 
-      const doc = await db().collection('users').findOne({ _id: user.id })
+      const doc = await db().collection<{ _id: string; email: string }>('users').findOne({ _id: user.id })
       expect(doc).not.toBeNull()
       expect(doc!._id).toBe(user.id)
       expect(doc!.email).toBe('alice@example.com')

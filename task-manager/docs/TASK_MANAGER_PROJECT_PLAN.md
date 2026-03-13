@@ -91,13 +91,28 @@ A DB gateway abstracts all storage. The rest of the app works only with domain t
 - Full test coverage
 - **Learning focus:** TypeScript fundamentals, type system, JS runtime behavior, testing
 
-### Phase 2: REST API Layer
-- HTTP framework (Express or Fastify, TBD)
+### Phase 2: REST API Layer — in progress
+- HTTP framework: **Express** (v5)
+- Testing: **Supertest** integration tests against real MongoDB
 - Routing, validation, error handling
 - Auth middleware (bearer token → session lookup → userId on request)
+  - Placeholder in place: reads `X-User-Id` header, returns 401 if missing
+- Response mapping: `toTaskResponse` strips internal fields (`userId`, `deletedAt`) from API responses
 - Request logging
 - Rate limiting: per-IP (unauthenticated) and per-user (authenticated)
 - **Learning focus:** Node.js async patterns, middleware, request/response lifecycle
+
+Completed endpoints:
+- `GET /tasks` — list open tasks for the authenticated user ✅
+
+Remaining endpoints:
+- `POST /tasks` — create a task
+- `GET /tasks/:id` — get a single task
+- `PATCH /tasks/:id` — operations (complete, reopen, snooze, wake, set queue)
+- `DELETE /tasks/:id` — soft delete
+- `POST /tasks/:id/blockers` — add blockers
+- `DELETE /tasks/:id/blockers/:blockerId` — remove a blocker
+- `GET /tasks/search?q=...` — text search
 
 ### Phase 3: Persistence
 - MongoDB integration

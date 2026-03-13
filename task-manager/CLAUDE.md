@@ -26,7 +26,7 @@ npm test -- --run  # run tests once and exit
 
 **Phase 1: Core Domain Modeling** — complete.
 **Phase 3: Persistence** — complete.
-**Phase 2: REST API Layer** — not started.
+**Phase 2: REST API Layer** — in progress.
 
 Completed:
 - `src/domain/task.ts` — `Task` type and `createTask` factory (uses UUIDv7 for IDs)
@@ -37,6 +37,11 @@ Completed:
 - `src/repository/task_repository.ts` — `insertTask`, `updateTask(old, updated)`, `findTaskById(userId, taskId)`, `findOpenTasks(userId, limit?)`, `searchTasks(userId, query, limit?)`, document mapping (`toDocument`/`fromDocument`). Uses `task.id` as MongoDB `_id`. Queries filter out soft-deleted records by default. Text search also excludes completed tasks.
 - `src/repository/user_repository.ts` — `insertUser`, `findUserById`, `findUserByEmail`
 - `src/repository/indexes.ts` — `ensureIndexes()`: compound index on tasks (`userId`, `deletedAt`, `completedAt`), unique index on `users.email`, text index on tasks (`userId` prefix, `title` weight 2, `details` weight 1)
+- `src/api/app.ts` — Express app setup: JSON body parsing, placeholder auth middleware (`X-User-Id` header), mounts task routes. Exports `app` without calling `.listen()` (for supertest).
+- `src/api/tasks.ts` — `GET /tasks` route. Response mapped via `toTaskResponse` (excludes `userId`, `deletedAt`).
+- `src/api/express.d.ts` — declaration merging to add `userId` to Express `Request`
+- `src/api/tasks.test.ts` — supertest integration tests for `GET /tasks` (auth, empty list, response shape, user isolation)
+- `src/index.ts` — entrypoint: runs `ensureIndexes()`, starts Express on `PORT` (default 3000)
 
 See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
 
