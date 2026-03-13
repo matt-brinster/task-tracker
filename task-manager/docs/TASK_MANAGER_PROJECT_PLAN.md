@@ -20,7 +20,7 @@ A task has:
 - **Queue:** Todo or Backlog. Todo is the default. Backlog is a low priority "someday maybe" bucket.
 - **completedAt:** Nullable timestamp. Set means done.
 - **snoozedUntil:** Nullable timestamp. Set and in the future means snoozed.
-- **Blockers:** A collection of other task IDs that block this task. Stored as a junction table in the DB. Not automatically cleaned up when a blocker is completed.
+- **Blockers:** A collection of `{ id, title }` pairs denormalized from the blocking task. Stored as an embedded array on the task document. Not automatically cleaned up when a blocker is completed.
 
 ### Operations
 There is no state machine. "Transitions" are data operations:
@@ -47,6 +47,7 @@ The frontend receives raw task data and is responsible for:
 ### Edge Cases
 - Cycle detection for blocker chains is deferred
 - Stale blocker ID cleanup (blockers pointing to completed tasks) is deferred
+- **Blocker title fan-out:** When a task's title changes, denormalized blocker titles on other tasks become stale. Plan: async fan-out in the repo layer (using `updateMany` with positional `$set`) with a warning log if the affected count is high. Deferred until logging is in place. Long-term, move to async/background fan-out.
 
 ### Snooze Behavior
 - Short term: expired snoozes are resolved lazily on task lookup
