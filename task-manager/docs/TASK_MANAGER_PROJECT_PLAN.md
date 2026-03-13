@@ -10,7 +10,7 @@ Also serves as a learning vehicle for strengthening JavaScript and TypeScript sk
 ### User
 A user has:
 - **id:** GUID
-- **email:** string
+- **emails:** strings
 
 Credentials (session tokens, verification tokens) are an infrastructure concern, not modeled in the domain. User provisioning is manual — the admin inserts rows directly into the DB.
 
@@ -79,6 +79,8 @@ Passwordless magic link flow:
 
 ### Repository Layer
 A DB gateway abstracts all storage. The rest of the app works only with domain types (`Task`, `User`); the repository handles SQL, row mapping, and type conversion (e.g. timestamp strings → `Date`, blocker rows → `Set<string>`).
+
+- **Soft-delete convention:** `findTaskById` filters out soft-deleted records by default. If a use case needs deleted records (e.g. blocker reference integrity), add a `findTaskByIdWithTrashed` variant rather than adding a flag parameter.
 
 ## Phases
 

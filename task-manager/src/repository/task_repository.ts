@@ -55,3 +55,16 @@ export async function insertTask(task: Task): Promise<void> {
 export async function updateTask(_old: Task, updated: Task): Promise<void> {
   await collection().replaceOne({ _id: updated.id }, toDocument(updated))
 }
+
+export async function findTaskById(userId: string, taskId: string): Promise<Task | null> {
+  const doc = await collection().findOne({ _id: taskId, userId, deletedAt: null })
+  return doc ? fromDocument(doc) : null
+}
+
+export async function findOpenTasks(userId: string, limit = 1000): Promise<Task[]> {
+  const docs = await collection()
+    .find({ userId, deletedAt: null, completedAt: null })
+    .limit(limit)
+    .toArray()
+  return docs.map(fromDocument)
+}

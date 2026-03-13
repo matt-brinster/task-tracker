@@ -33,7 +33,7 @@ Completed:
 - `src/domain/task_operations.test.ts` — full test coverage for all operations above
 - `src/domain/user.ts` — `User` type (id, email; no operations)
 - `src/repository/client.ts` — MongoDB client and `db()` helper
-- `src/repository/task_repository.ts` — `insertTask`, `updateTask(old, updated)`, document mapping (`toDocument`/`fromDocument`). Uses `task.id` as MongoDB `_id`.
+- `src/repository/task_repository.ts` — `insertTask`, `updateTask(old, updated)`, `findTaskById(userId, taskId)`, `findOpenTasks(userId, limit?)`, document mapping (`toDocument`/`fromDocument`). Uses `task.id` as MongoDB `_id`. Queries filter out soft-deleted records by default.
 
 See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
 
