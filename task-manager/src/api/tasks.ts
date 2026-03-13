@@ -2,7 +2,7 @@ import { Router } from 'express'
 import type { Task } from '../domain/task.js'
 import { createTask } from '../domain/task.js'
 import type { Queue } from '../domain/task.js'
-import { deleteTask } from '../domain/task_operations.js'
+import { completeTask, deleteTask } from '../domain/task_operations.js'
 import { findOpenTasks, findTaskById, insertTask, updateTask } from '../repository/task_repository.js'
 
 function toTaskResponse(task: Task) {
@@ -65,4 +65,15 @@ taskRouter.delete('/:id', async (req, res) => {
   const deleted = deleteTask(task, new Date())
   await updateTask(task, deleted)
   res.status(204).end()
+})
+
+taskRouter.post('/:id/complete', async (req, res) => {
+  const task = await findTaskById(req.userId, req.params.id)
+  if (!task) {
+    res.status(404).json({ error: 'Task not found' })
+    return
+  }
+  const completed = completeTask(task, new Date())
+  await updateTask(task, completed)
+  res.json(toTaskResponse(completed))
 })

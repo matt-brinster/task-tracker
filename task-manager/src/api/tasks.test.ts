@@ -287,3 +287,67 @@ describe('DELETE /tasks/:id', () => {
     expect(res.status).toBe(404)
   })
 })
+
+describe('POST /tasks/:id/complete', () => {
+  it('completes a task and returns it', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/complete`)
+      .set('X-User-Id', 'user-1')
+
+    expect(res.status).toBe(200)
+    expect(res.body.id).toBe(task.id)
+    expect(res.body.completedAt).not.toBeNull()
+  })
+
+  it('persists the completion', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    await request(app)
+      .post(`/tasks/${task.id}/complete`)
+      .set('X-User-Id', 'user-1')
+
+    const getRes = await request(app)
+      .get(`/tasks/${task.id}`)
+      .set('X-User-Id', 'user-1')
+
+    expect(getRes.body.completedAt).not.toBeNull()
+  })
+
+  it('removes the task from GET /tasks/open', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    await request(app)
+      .post(`/tasks/${task.id}/complete`)
+      .set('X-User-Id', 'user-1')
+
+    const listRes = await request(app)
+      .get('/tasks/open')
+      .set('X-User-Id', 'user-1')
+
+    expect(listRes.body).toEqual([])
+  })
+
+  it('returns 404 when the task does not exist', async () => {
+    const res = await request(app)
+      .post('/tasks/nonexistent-id/complete')
+      .set('X-User-Id', 'user-1')
+
+    expect(res.status).toBe(404)
+  })
+
+  it('returns 404 when the task belongs to a different user', async () => {
+    const task = createTask('user-1', 'Private task')
+    await insertTask(task)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/complete`)
+      .set('X-User-Id', 'user-2')
+
+    expect(res.status).toBe(404)
+  })
+})
