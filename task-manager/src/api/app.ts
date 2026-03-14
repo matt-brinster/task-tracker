@@ -1,5 +1,8 @@
 import express from 'express'
 import type { ErrorRequestHandler } from 'express'
+import { hashToken } from '../domain/crypto.js'
+import { findSessionByTokenHash, updateLastUsedAt } from '../repository/session_repository.js'
+import { authRouter } from './auth.js'
 import { taskRouter } from './tasks.js'
 
 const app = express()
@@ -15,15 +18,28 @@ app.use((req, res, next) => {
   next()
 })
 
-// Placeholder auth: reads X-User-Id header.
-// Replace with real auth middleware (bearer token → session lookup) later.
-app.use((req, res, next) => {
-  const userId = req.headers['x-user-id']
-  if (typeof userId !== 'string' || userId === '') {
-    res.status(401).json({ error: 'Missing X-User-Id header' })
+// Auth routes are unauthenticated (you need them to get a token)
+app.use('/auth', authRouter)
+
+// Bearer token auth middleware
+app.use(async (req, res, next) => {
+  const header = req.headers.authorization
+  if (typeof header !== 'string' || !header.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Missing or invalid Authorization header' })
     return
   }
-  req.userId = userId
+
+  const rawToken = header.slice(7)
+  const tokenHash = hashToken(rawToken)
+  const session = await findSessionByTokenHash(tokenHash)
+
+  if (!session) {
+    res.status(401).json({ error: 'Invalid session token' })
+    return
+  }
+
+  req.userId = session.userId
+  updateLastUsedAt(session.id, new Date())
   next()
 })
 

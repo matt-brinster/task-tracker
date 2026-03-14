@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import request from 'supertest'
 import app from './app.js'
 import { client, db } from '../repository/client.js'
@@ -6,31 +6,39 @@ import { ensureIndexes } from '../repository/indexes.js'
 import { createTask } from '../domain/task.js'
 import { completeTask, deleteTask, snoozeTask, addBlockers } from '../domain/task_operations.js'
 import { insertTask, updateTask } from '../repository/task_repository.js'
+import { createTestSession } from './test-helpers.js'
+
+let token1: string
+let token2: string
 
 beforeAll(async () => {
   await client.connect()
   await ensureIndexes()
 })
 
+beforeEach(async () => {
+  token1 = await createTestSession('user-1')
+  token2 = await createTestSession('user-2')
+})
+
 afterEach(async () => {
   await db().collection('tasks').deleteMany({})
+  await db().collection('sessions').deleteMany({})
 })
 
 afterAll(async () => {
   await client.close()
 })
 
-describe('GET /tasks/open', () => {
-  it('returns 401 without X-User-Id header', async () => {
-    const res = await request(app).get('/tasks/open')
-    expect(res.status).toBe(401)
-    expect(res.body.error).toBe('Missing X-User-Id header')
-  })
+function auth(token: string) {
+  return ['Authorization', `Bearer ${token}`] as const
+}
 
+describe('GET /tasks/open', () => {
   it('returns an empty array when the user has no tasks', async () => {
     const res = await request(app)
       .get('/tasks/open')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(200)
     expect(res.body).toEqual([])
@@ -42,7 +50,7 @@ describe('GET /tasks/open', () => {
 
     const res = await request(app)
       .get('/tasks/open')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(200)
     expect(res.body).toHaveLength(1)
@@ -58,7 +66,7 @@ describe('GET /tasks/open', () => {
 
     const res = await request(app)
       .get('/tasks/open')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.body[0]).not.toHaveProperty('userId')
     expect(res.body[0]).not.toHaveProperty('deletedAt')
@@ -70,7 +78,7 @@ describe('GET /tasks/open', () => {
 
     const res = await request(app)
       .get('/tasks/open')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.body).toHaveLength(1)
     expect(res.body[0].title).toBe('My task')
@@ -84,7 +92,7 @@ describe('GET /tasks/:id', () => {
 
     const res = await request(app)
       .get(`/tasks/${task.id}`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(200)
     expect(res.body.id).toBe(task.id)
@@ -95,7 +103,7 @@ describe('GET /tasks/:id', () => {
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
       .get('/tasks/nonexistent-id')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(404)
     expect(res.body.error).toBe('Task not found')
@@ -107,7 +115,7 @@ describe('GET /tasks/:id', () => {
 
     const res = await request(app)
       .get(`/tasks/${task.id}`)
-      .set('X-User-Id', 'user-2')
+      .set(...auth(token2))
 
     expect(res.status).toBe(404)
   })
@@ -119,7 +127,7 @@ describe('GET /tasks/:id', () => {
 
     const res = await request(app)
       .get(`/tasks/${task.id}`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(404)
   })
@@ -130,7 +138,7 @@ describe('GET /tasks/:id', () => {
 
     const res = await request(app)
       .get(`/tasks/${task.id}`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.body).not.toHaveProperty('userId')
     expect(res.body).not.toHaveProperty('deletedAt')
@@ -141,7 +149,7 @@ describe('POST /tasks', () => {
   it('creates a task with just a title', async () => {
     const res = await request(app)
       .post('/tasks')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ title: 'Buy milk' })
 
     expect(res.status).toBe(201)
@@ -154,7 +162,7 @@ describe('POST /tasks', () => {
   it('creates a task with details and queue', async () => {
     const res = await request(app)
       .post('/tasks')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ title: 'Sort backlog', details: 'review priorities', queue: 'backlog' })
 
     expect(res.status).toBe(201)
@@ -165,12 +173,12 @@ describe('POST /tasks', () => {
   it('persists the task to the database', async () => {
     const res = await request(app)
       .post('/tasks')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ title: 'Buy milk' })
 
     const getRes = await request(app)
       .get(`/tasks/${res.body.id}`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(getRes.status).toBe(200)
     expect(getRes.body.title).toBe('Buy milk')
@@ -179,7 +187,7 @@ describe('POST /tasks', () => {
   it('trims whitespace from the title', async () => {
     const res = await request(app)
       .post('/tasks')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ title: '  Buy milk  ' })
 
     expect(res.body.title).toBe('Buy milk')
@@ -188,7 +196,7 @@ describe('POST /tasks', () => {
   it('returns 400 when title is missing', async () => {
     const res = await request(app)
       .post('/tasks')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({})
 
     expect(res.status).toBe(400)
@@ -198,7 +206,7 @@ describe('POST /tasks', () => {
   it('returns 400 when title is empty', async () => {
     const res = await request(app)
       .post('/tasks')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ title: '   ' })
 
     expect(res.status).toBe(400)
@@ -208,7 +216,7 @@ describe('POST /tasks', () => {
   it('returns 400 for invalid queue value', async () => {
     const res = await request(app)
       .post('/tasks')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ title: 'Buy milk', queue: 'urgent' })
 
     expect(res.status).toBe(400)
@@ -218,7 +226,7 @@ describe('POST /tasks', () => {
   it('does not include userId or deletedAt in the response', async () => {
     const res = await request(app)
       .post('/tasks')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ title: 'Buy milk' })
 
     expect(res.body).not.toHaveProperty('userId')
@@ -233,7 +241,7 @@ describe('DELETE /tasks/:id', () => {
 
     const res = await request(app)
       .delete(`/tasks/${task.id}`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(204)
   })
@@ -244,11 +252,11 @@ describe('DELETE /tasks/:id', () => {
 
     await request(app)
       .delete(`/tasks/${task.id}`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     const getRes = await request(app)
       .get(`/tasks/${task.id}`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(getRes.status).toBe(404)
   })
@@ -259,11 +267,11 @@ describe('DELETE /tasks/:id', () => {
 
     await request(app)
       .delete(`/tasks/${task.id}`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     const listRes = await request(app)
       .get('/tasks/open')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(listRes.body).toEqual([])
   })
@@ -271,7 +279,7 @@ describe('DELETE /tasks/:id', () => {
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
       .delete('/tasks/nonexistent-id')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(404)
   })
@@ -282,7 +290,7 @@ describe('DELETE /tasks/:id', () => {
 
     const res = await request(app)
       .delete(`/tasks/${task.id}`)
-      .set('X-User-Id', 'user-2')
+      .set(...auth(token2))
 
     expect(res.status).toBe(404)
   })
@@ -295,7 +303,7 @@ describe('POST /tasks/:id/complete', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/complete`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(200)
     expect(res.body.id).toBe(task.id)
@@ -308,11 +316,11 @@ describe('POST /tasks/:id/complete', () => {
 
     await request(app)
       .post(`/tasks/${task.id}/complete`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     const getRes = await request(app)
       .get(`/tasks/${task.id}`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(getRes.body.completedAt).not.toBeNull()
   })
@@ -323,11 +331,11 @@ describe('POST /tasks/:id/complete', () => {
 
     await request(app)
       .post(`/tasks/${task.id}/complete`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     const listRes = await request(app)
       .get('/tasks/open')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(listRes.body).toEqual([])
   })
@@ -335,7 +343,7 @@ describe('POST /tasks/:id/complete', () => {
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
       .post('/tasks/nonexistent-id/complete')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(404)
   })
@@ -346,7 +354,7 @@ describe('POST /tasks/:id/complete', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/complete`)
-      .set('X-User-Id', 'user-2')
+      .set(...auth(token2))
 
     expect(res.status).toBe(404)
   })
@@ -360,7 +368,7 @@ describe('POST /tasks/:id/reopen', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/reopen`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(200)
     expect(res.body.completedAt).toBeNull()
@@ -373,11 +381,11 @@ describe('POST /tasks/:id/reopen', () => {
 
     await request(app)
       .post(`/tasks/${task.id}/reopen`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     const listRes = await request(app)
       .get('/tasks/open')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(listRes.body).toHaveLength(1)
     expect(listRes.body[0].title).toBe('Buy milk')
@@ -386,7 +394,7 @@ describe('POST /tasks/:id/reopen', () => {
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
       .post('/tasks/nonexistent-id/reopen')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(404)
   })
@@ -399,7 +407,7 @@ describe('POST /tasks/:id/snooze', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/snooze`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ until: '2026-04-01T12:00:00Z' })
 
     expect(res.status).toBe(200)
@@ -412,12 +420,12 @@ describe('POST /tasks/:id/snooze', () => {
 
     await request(app)
       .post(`/tasks/${task.id}/snooze`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ until: '2026-04-01T12:00:00Z' })
 
     const getRes = await request(app)
       .get(`/tasks/${task.id}`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(getRes.body.snoozedUntil).toBe('2026-04-01T12:00:00.000Z')
   })
@@ -428,7 +436,7 @@ describe('POST /tasks/:id/snooze', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/snooze`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({})
 
     expect(res.status).toBe(400)
@@ -441,7 +449,7 @@ describe('POST /tasks/:id/snooze', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/snooze`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ until: 'not-a-date' })
 
     expect(res.status).toBe(400)
@@ -451,7 +459,7 @@ describe('POST /tasks/:id/snooze', () => {
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
       .post('/tasks/nonexistent-id/snooze')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ until: '2026-04-01T12:00:00Z' })
 
     expect(res.status).toBe(404)
@@ -466,7 +474,7 @@ describe('POST /tasks/:id/wake', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/wake`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(200)
     expect(res.body.snoozedUntil).toBeNull()
@@ -479,11 +487,11 @@ describe('POST /tasks/:id/wake', () => {
 
     await request(app)
       .post(`/tasks/${task.id}/wake`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     const getRes = await request(app)
       .get(`/tasks/${task.id}`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(getRes.body.snoozedUntil).toBeNull()
   })
@@ -491,7 +499,7 @@ describe('POST /tasks/:id/wake', () => {
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
       .post('/tasks/nonexistent-id/wake')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(404)
   })
@@ -501,7 +509,7 @@ describe('GET /tasks/search', () => {
   it('returns 400 when q is missing', async () => {
     const res = await request(app)
       .get('/tasks/open/search')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/q query parameter is required/)
@@ -510,7 +518,7 @@ describe('GET /tasks/search', () => {
   it('returns 400 when q is empty', async () => {
     const res = await request(app)
       .get('/tasks/open/search?q=')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/q query parameter is required/)
@@ -519,7 +527,7 @@ describe('GET /tasks/search', () => {
   it('returns 400 when q is only whitespace', async () => {
     const res = await request(app)
       .get('/tasks/open/search?q=%20%20')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/q query parameter is required/)
@@ -531,7 +539,7 @@ describe('GET /tasks/search', () => {
 
     const res = await request(app)
       .get('/tasks/open/search?q=groceries')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(200)
     expect(res.body).toHaveLength(1)
@@ -543,7 +551,7 @@ describe('GET /tasks/search', () => {
 
     const res = await request(app)
       .get('/tasks/open/search?q=unicorn')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.status).toBe(200)
     expect(res.body).toEqual([])
@@ -555,7 +563,7 @@ describe('GET /tasks/search', () => {
 
     const res = await request(app)
       .get('/tasks/open/search?q=groceries')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.body).toHaveLength(1)
   })
@@ -567,7 +575,7 @@ describe('GET /tasks/search', () => {
 
     const res = await request(app)
       .get('/tasks/open/search?q=groceries')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.body).toEqual([])
   })
@@ -579,7 +587,7 @@ describe('GET /tasks/search', () => {
 
     const res = await request(app)
       .get('/tasks/open/search?q=groceries')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.body).toEqual([])
   })
@@ -589,7 +597,7 @@ describe('GET /tasks/search', () => {
 
     const res = await request(app)
       .get('/tasks/open/search?q=groceries')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.body[0]).not.toHaveProperty('userId')
     expect(res.body[0]).not.toHaveProperty('deletedAt')
@@ -600,7 +608,7 @@ describe('GET /tasks/search', () => {
 
     const res = await request(app)
       .get('/tasks/open/search?q=bananas')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(res.body).toHaveLength(1)
     expect(res.body[0].title).toBe('Shopping')
@@ -614,7 +622,7 @@ describe('POST /tasks/:id/queue', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/queue`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ queue: 'backlog' })
 
     expect(res.status).toBe(200)
@@ -627,7 +635,7 @@ describe('POST /tasks/:id/queue', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/queue`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ queue: 'todo' })
 
     expect(res.status).toBe(200)
@@ -640,12 +648,12 @@ describe('POST /tasks/:id/queue', () => {
 
     await request(app)
       .post(`/tasks/${task.id}/queue`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ queue: 'backlog' })
 
     const getRes = await request(app)
       .get(`/tasks/${task.id}`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(getRes.body.queue).toBe('backlog')
   })
@@ -656,7 +664,7 @@ describe('POST /tasks/:id/queue', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/queue`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ queue: 'urgent' })
 
     expect(res.status).toBe(400)
@@ -666,7 +674,7 @@ describe('POST /tasks/:id/queue', () => {
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
       .post('/tasks/nonexistent-id/queue')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ queue: 'backlog' })
 
     expect(res.status).toBe(404)
@@ -682,7 +690,7 @@ describe('POST /tasks/:id/blockers', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/blockers`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ id: blocker.id })
 
     expect(res.status).toBe(200)
@@ -699,7 +707,7 @@ describe('POST /tasks/:id/blockers', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/blockers`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ id: blocker.id })
 
     expect(res.body.blockers[0].title).toBe('Original title')
@@ -718,7 +726,7 @@ describe('POST /tasks/:id/blockers', () => {
     // Try to add the same blocker via API
     const res = await request(app)
       .post(`/tasks/${withBlocker.id}/blockers`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ id: blocker.id })
 
     expect(res.status).toBe(200)
@@ -733,12 +741,12 @@ describe('POST /tasks/:id/blockers', () => {
 
     await request(app)
       .post(`/tasks/${task.id}/blockers`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ id: blocker.id })
 
     const getRes = await request(app)
       .get(`/tasks/${task.id}`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(getRes.body.blockers).toHaveLength(1)
     expect(getRes.body.blockers[0].id).toBe(blocker.id)
@@ -750,7 +758,7 @@ describe('POST /tasks/:id/blockers', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/blockers`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({})
 
     expect(res.status).toBe(400)
@@ -763,7 +771,7 @@ describe('POST /tasks/:id/blockers', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/blockers`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ id: 'nonexistent-id' })
 
     expect(res.status).toBe(404)
@@ -778,7 +786,7 @@ describe('POST /tasks/:id/blockers', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/blockers`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ id: otherUserTask.id })
 
     expect(res.status).toBe(404)
@@ -788,7 +796,7 @@ describe('POST /tasks/:id/blockers', () => {
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
       .post('/tasks/nonexistent-id/blockers')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ id: 'some-id' })
 
     expect(res.status).toBe(404)
@@ -800,7 +808,7 @@ describe('POST /tasks/:id/blockers', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/blockers`)
-      .set('X-User-Id', 'user-2')
+      .set(...auth(token2))
       .send({ id: 'some-id' })
 
     expect(res.status).toBe(404)
@@ -819,7 +827,7 @@ describe('POST /tasks/:id/blockers/remove', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/blockers/remove`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ id: blocker.id })
 
     expect(res.status).toBe(200)
@@ -835,7 +843,7 @@ describe('POST /tasks/:id/blockers/remove', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/blockers/remove`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ id: 'nonexistent-id' })
 
     expect(res.status).toBe(200)
@@ -851,12 +859,12 @@ describe('POST /tasks/:id/blockers/remove', () => {
 
     await request(app)
       .post(`/tasks/${task.id}/blockers/remove`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ id: blocker.id })
 
     const getRes = await request(app)
       .get(`/tasks/${task.id}`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
 
     expect(getRes.body.blockers).toHaveLength(0)
   })
@@ -867,7 +875,7 @@ describe('POST /tasks/:id/blockers/remove', () => {
 
     const res = await request(app)
       .post(`/tasks/${task.id}/blockers/remove`)
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({})
 
     expect(res.status).toBe(400)
@@ -877,7 +885,7 @@ describe('POST /tasks/:id/blockers/remove', () => {
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
       .post('/tasks/nonexistent-id/blockers/remove')
-      .set('X-User-Id', 'user-1')
+      .set(...auth(token1))
       .send({ id: 'b1' })
 
     expect(res.status).toBe(404)

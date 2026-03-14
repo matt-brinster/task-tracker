@@ -36,11 +36,20 @@ Completed:
 - `src/repository/client.ts` — MongoDB client and `db()` helper
 - `src/repository/task_repository.ts` — `insertTask`, `updateTask(old, updated)`, `findTaskById(userId, taskId)`, `findOpenTasks(userId, limit?)`, `searchTasks(userId, query, limit?)`, document mapping (`toDocument`/`fromDocument`). Uses `task.id` as MongoDB `_id`. Queries filter out soft-deleted records by default. Text search also excludes completed tasks.
 - `src/repository/user_repository.ts` — `insertUser`, `findUserById`, `findUserByEmail`
-- `src/repository/indexes.ts` — `ensureIndexes()`: compound index on tasks (`userId`, `deletedAt`, `completedAt`), unique index on `users.email`, text index on tasks (`userId` prefix, `title` weight 2, `details` weight 1)
-- `src/api/app.ts` — Express app setup: JSON body parsing, request logging middleware (method, path, status, duration), placeholder auth middleware (`X-User-Id` header), mounts task routes, global error handler (returns JSON 500). Exports `app` without calling `.listen()` (for supertest).
+- `src/domain/crypto.ts` — `generateToken()` (32 random bytes, base64url) and `hashToken()` (SHA-256 hex)
+- `src/domain/invitation.ts` — `Invitation` type and `createInvitation(userId)` factory. Returns `{ invitation, rawToken }` — raw token is handed out, only the hash is stored.
+- `src/domain/session.ts` — `Session` type and `createSession(userId)` factory. Returns `{ session, rawToken }`.
+- `src/domain/auth.test.ts` — tests for crypto, invitation, and session domain (11 tests)
+- `src/repository/invitation_repository.ts` — `insertInvitation`, `findInvitationByTokenHash`, `incrementSessionCount`
+- `src/repository/session_repository.ts` — `insertSession`, `findSessionByTokenHash`, `updateLastUsedAt`
+- `src/repository/indexes.ts` — `ensureIndexes()`: compound index on tasks (`userId`, `deletedAt`, `completedAt`), unique index on `users.email`, text index on tasks, unique indexes on `invitations.tokenHash` and `sessions.tokenHash`
+- `src/api/app.ts` — Express app setup: JSON body parsing, request logging middleware (method, path, status, duration), bearer token auth middleware (hashes token → session lookup → sets `req.userId`), mounts auth routes (unauthenticated) and task routes (authenticated), global error handler (returns JSON 500). Exports `app` without calling `.listen()` (for supertest).
+- `src/api/auth.ts` — auth routes. `POST /auth/redeem` — accepts `{ key }`, validates invitation, creates session, returns `{ token }`. Enforces 10-session-per-invitation limit.
 - `src/api/tasks.ts` — task routes. Response mapped via `toTaskResponse` (excludes `userId`, `deletedAt`). Endpoints: `GET /tasks/open`, `POST /tasks`, `GET /tasks/:id`, `DELETE /tasks/:id`, `POST /tasks/:id/{complete,reopen,snooze,wake,queue,blockers,blockers/remove}`, `GET /tasks/open/search?q=...`.
 - `src/api/express.d.ts` — declaration merging to add `userId` to Express `Request`
-- `src/api/tasks.test.ts` — supertest integration tests for all task endpoints (68 tests)
+- `src/api/test-helpers.ts` — `createTestSession(userId)` — inserts a session and returns raw bearer token for use in tests
+- `src/api/tasks.test.ts` — supertest integration tests for all task endpoints (67 tests, bearer token auth)
+- `src/api/auth.test.ts` — supertest integration tests for redeem endpoint and auth middleware (11 tests)
 - `src/api/app.test.ts` — app-level middleware tests (error handler)
 - `src/index.ts` — entrypoint: runs `ensureIndexes()`, starts Express on `PORT` (default 3000)
 

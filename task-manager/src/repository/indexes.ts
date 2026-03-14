@@ -18,4 +18,17 @@ export async function ensureIndexes(): Promise<void> {
     { userId: 1, title: 'text', details: 'text' },
     { name: 'tasks_text', weights: { title: 2, details: 1 } }
   )
+
+  const invitations = db().collection('invitations')
+  const sessions = db().collection('sessions')
+
+  await invitations.createIndex(
+    { tokenHash: 1 },
+    { name: 'invitations_tokenHash', unique: true }
+  )
+
+  await sessions.createIndex(
+    { tokenHash: 1 },
+    { name: 'sessions_tokenHash', unique: true }
+  )
 }

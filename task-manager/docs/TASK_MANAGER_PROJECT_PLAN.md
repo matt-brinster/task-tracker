@@ -116,9 +116,12 @@ A DB gateway abstracts all storage. The rest of the app works only with domain t
 - HTTP framework: **Express** (v5)
 - Testing: **Supertest** integration tests against real MongoDB
 - Routing, validation, error handling ✅
-- Auth: invitation key redemption + bearer token session middleware
-  - Placeholder in place: reads `X-User-Id` header, returns 401 if missing
-  - Next: `POST /auth/redeem`, real bearer token middleware, invitation/session repositories
+- Auth: invitation key redemption + bearer token session middleware ✅
+  - `POST /auth/redeem` — accepts invitation key, creates session, returns bearer token ✅
+  - Bearer token middleware — hashes token, looks up session, sets `req.userId` ✅
+  - Invitation and session domain types, repositories, and indexes ✅
+  - Remaining: admin provisioning script/tooling to create users + invitations
+  - Remaining: more test coverage for sessions and auth (e.g. `lastUsedAt` updates, invitation/session repository integration tests)
 - Response mapping: `toTaskResponse` strips internal fields (`userId`, `deletedAt`) from API responses ✅
 - Global error handler: catches unhandled errors, returns JSON `{ error: "Internal server error" }` with 500 ✅
 - Request logging: middleware logs `method path status duration` to stdout ✅
@@ -126,6 +129,7 @@ A DB gateway abstracts all storage. The rest of the app works only with domain t
 - **Learning focus:** Node.js async patterns, middleware, request/response lifecycle
 
 Completed endpoints:
+- `POST /auth/redeem` — redeem invitation key, returns bearer token (body: `{ key }`) ✅
 - `GET /tasks/open` — list open tasks for the authenticated user ✅
 - `POST /tasks` — create a task ✅
 - `GET /tasks/:id` — get a single task ✅
@@ -146,8 +150,8 @@ Completed endpoints:
   - `{ userId: 1, deletedAt: 1, completedAt: 1 }` — primary query: user's incomplete tasks ✅
   - `{ email: 1 }` unique — user lookup by email ✅
   - `{ userId: 1, title: "text", details: "text" }` — full-text search (userId prefix, title weight 2, details weight 1) ✅
-  - `{ tokenHash: 1 }` unique on `invitations` — invitation key lookup
-  - `{ tokenHash: 1 }` unique on `sessions` — bearer token lookup
+  - `{ tokenHash: 1 }` unique on `invitations` — invitation key lookup ✅
+  - `{ tokenHash: 1 }` unique on `sessions` — bearer token lookup ✅
 - `ensureIndexes()` uses `createIndex` which is a no-op for identical definitions but errors if the name matches with a different definition. Changing an index shape requires dropping the old one first. Need a migration strategy for production (deferred).
 - **End-to-end test needed:** duplicate email rejection (requires `ensureIndexes()` to have run)
 - **Learning focus:** async I/O, MongoDB driver, document modeling, indexing
