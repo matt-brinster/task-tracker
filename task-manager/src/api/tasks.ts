@@ -2,7 +2,7 @@ import { Router } from 'express'
 import type { Task } from '../domain/task.js'
 import { createTask } from '../domain/task.js'
 import type { Queue } from '../domain/task.js'
-import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, setQueue } from '../domain/task_operations.js'
+import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, setQueue, addBlockers, removeBlockers } from '../domain/task_operations.js'
 import { findOpenTasks, findTaskById, insertTask, updateTask, searchTasks } from '../repository/task_repository.js'
 
 function toTaskResponse(task: Task) {
@@ -147,6 +147,48 @@ taskRouter.post('/:id/queue', async (req, res) => {
   }
 
   const updated = setQueue(task, queue)
+  await updateTask(task, updated)
+  res.json(toTaskResponse(updated))
+})
+
+taskRouter.post('/:id/blockers', async (req, res) => {
+  const task = await findTaskById(req.userId, req.params.id)
+  if (!task) {
+    res.status(404).json({ error: 'Task not found' })
+    return
+  }
+
+  const { id } = req.body
+  if (typeof id !== 'string' || id.trim() === '') {
+    res.status(400).json({ error: 'id is required' })
+    return
+  }
+
+  const blockerTask = await findTaskById(req.userId, id)
+  if (!blockerTask) {
+    res.status(404).json({ error: 'Blocker task not found' })
+    return
+  }
+
+  const updated = addBlockers(task, [blockerTask])
+  await updateTask(task, updated)
+  res.json(toTaskResponse(updated))
+})
+
+taskRouter.post('/:id/blockers/remove', async (req, res) => {
+  const task = await findTaskById(req.userId, req.params.id)
+  if (!task) {
+    res.status(404).json({ error: 'Task not found' })
+    return
+  }
+
+  const { id } = req.body
+  if (typeof id !== 'string' || id.trim() === '') {
+    res.status(400).json({ error: 'id is required' })
+    return
+  }
+
+  const updated = removeBlockers(task, new Set([id]))
   await updateTask(task, updated)
   res.json(toTaskResponse(updated))
 })

@@ -114,8 +114,8 @@ Completed endpoints:
 - `POST /tasks/:id/queue` — set queue (body: `{ queue }`) ✅
 
 Remaining endpoints:
-- `POST /tasks/:id/blockers` — add blockers
-- `DELETE /tasks/:id/blockers/:blockerId` — remove a blocker
+- `POST /tasks/:id/blockers` — add blocker (body: `{ id }`, server looks up title) ✅
+- `POST /tasks/:id/blockers/remove` — remove blocker (body: `{ id }`) ✅
 - `GET /tasks/open/search?q=...` — text search (open tasks only) ✅
 
 ### Phase 3: Persistence

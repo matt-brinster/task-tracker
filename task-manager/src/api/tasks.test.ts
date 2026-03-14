@@ -4,7 +4,7 @@ import app from './app.js'
 import { client, db } from '../repository/client.js'
 import { ensureIndexes } from '../repository/indexes.js'
 import { createTask } from '../domain/task.js'
-import { completeTask, deleteTask, snoozeTask } from '../domain/task_operations.js'
+import { completeTask, deleteTask, snoozeTask, addBlockers } from '../domain/task_operations.js'
 import { insertTask, updateTask } from '../repository/task_repository.js'
 
 beforeAll(async () => {
@@ -668,6 +668,217 @@ describe('POST /tasks/:id/queue', () => {
       .post('/tasks/nonexistent-id/queue')
       .set('X-User-Id', 'user-1')
       .send({ queue: 'backlog' })
+
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('POST /tasks/:id/blockers', () => {
+  it('adds a blocker by looking up the blocker task', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    const blocker = createTask('user-1', 'Get wallet')
+    await insertTask(task)
+    await insertTask(blocker)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/blockers`)
+      .set('X-User-Id', 'user-1')
+      .send({ id: blocker.id })
+
+    expect(res.status).toBe(200)
+    expect(res.body.blockers).toHaveLength(1)
+    expect(res.body.blockers[0].id).toBe(blocker.id)
+    expect(res.body.blockers[0].title).toBe('Get wallet')
+  })
+
+  it('uses the current title from the blocker task', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    const blocker = createTask('user-1', 'Original title')
+    await insertTask(task)
+    await insertTask(blocker)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/blockers`)
+      .set('X-User-Id', 'user-1')
+      .send({ id: blocker.id })
+
+    expect(res.body.blockers[0].title).toBe('Original title')
+  })
+
+  it('deduplicates a blocker already on the task', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    const blocker = createTask('user-1', 'Get wallet')
+    await insertTask(task)
+    await insertTask(blocker)
+
+    // Add once via domain, persist
+    const withBlocker = addBlockers(task, [{ id: blocker.id, title: blocker.title }])
+    await updateTask(task, withBlocker)
+
+    // Try to add the same blocker via API
+    const res = await request(app)
+      .post(`/tasks/${withBlocker.id}/blockers`)
+      .set('X-User-Id', 'user-1')
+      .send({ id: blocker.id })
+
+    expect(res.status).toBe(200)
+    expect(res.body.blockers).toHaveLength(1)
+  })
+
+  it('persists the blocker', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    const blocker = createTask('user-1', 'Get wallet')
+    await insertTask(task)
+    await insertTask(blocker)
+
+    await request(app)
+      .post(`/tasks/${task.id}/blockers`)
+      .set('X-User-Id', 'user-1')
+      .send({ id: blocker.id })
+
+    const getRes = await request(app)
+      .get(`/tasks/${task.id}`)
+      .set('X-User-Id', 'user-1')
+
+    expect(getRes.body.blockers).toHaveLength(1)
+    expect(getRes.body.blockers[0].id).toBe(blocker.id)
+  })
+
+  it('returns 400 when id is missing', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/blockers`)
+      .set('X-User-Id', 'user-1')
+      .send({})
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/id is required/)
+  })
+
+  it('returns 404 when the blocker task does not exist', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/blockers`)
+      .set('X-User-Id', 'user-1')
+      .send({ id: 'nonexistent-id' })
+
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe('Blocker task not found')
+  })
+
+  it('returns 404 when the blocker belongs to a different user', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    const otherUserTask = createTask('user-2', 'Their task')
+    await insertTask(task)
+    await insertTask(otherUserTask)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/blockers`)
+      .set('X-User-Id', 'user-1')
+      .send({ id: otherUserTask.id })
+
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe('Blocker task not found')
+  })
+
+  it('returns 404 when the task does not exist', async () => {
+    const res = await request(app)
+      .post('/tasks/nonexistent-id/blockers')
+      .set('X-User-Id', 'user-1')
+      .send({ id: 'some-id' })
+
+    expect(res.status).toBe(404)
+  })
+
+  it('returns 404 when the task belongs to a different user', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/blockers`)
+      .set('X-User-Id', 'user-2')
+      .send({ id: 'some-id' })
+
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('POST /tasks/:id/blockers/remove', () => {
+  it('removes a blocker from a task', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    const blocker = createTask('user-1', 'Get wallet')
+    await insertTask(task)
+    await insertTask(blocker)
+
+    const withBlocker = addBlockers(task, [{ id: blocker.id, title: blocker.title }])
+    await updateTask(task, withBlocker)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/blockers/remove`)
+      .set('X-User-Id', 'user-1')
+      .send({ id: blocker.id })
+
+    expect(res.status).toBe(200)
+    expect(res.body.blockers).toHaveLength(0)
+  })
+
+  it('ignores an id that is not in the blockers list', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    const blocker = createTask('user-1', 'Get wallet')
+    await insertTask(task)
+    const withBlocker = addBlockers(task, [{ id: blocker.id, title: blocker.title }])
+    await updateTask(task, withBlocker)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/blockers/remove`)
+      .set('X-User-Id', 'user-1')
+      .send({ id: 'nonexistent-id' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.blockers).toHaveLength(1)
+  })
+
+  it('persists the removal', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    const blocker = createTask('user-1', 'Get wallet')
+    await insertTask(task)
+    const withBlocker = addBlockers(task, [{ id: blocker.id, title: blocker.title }])
+    await updateTask(task, withBlocker)
+
+    await request(app)
+      .post(`/tasks/${task.id}/blockers/remove`)
+      .set('X-User-Id', 'user-1')
+      .send({ id: blocker.id })
+
+    const getRes = await request(app)
+      .get(`/tasks/${task.id}`)
+      .set('X-User-Id', 'user-1')
+
+    expect(getRes.body.blockers).toHaveLength(0)
+  })
+
+  it('returns 400 when id is missing', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/blockers/remove`)
+      .set('X-User-Id', 'user-1')
+      .send({})
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/id is required/)
+  })
+
+  it('returns 404 when the task does not exist', async () => {
+    const res = await request(app)
+      .post('/tasks/nonexistent-id/blockers/remove')
+      .set('X-User-Id', 'user-1')
+      .send({ id: 'b1' })
 
     expect(res.status).toBe(404)
   })
