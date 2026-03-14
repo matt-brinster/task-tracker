@@ -43,7 +43,9 @@ Completed:
 - `src/repository/invitation_repository.ts` — `insertInvitation`, `findInvitationByTokenHash`, `incrementSessionCount`
 - `src/repository/session_repository.ts` — `insertSession`, `findSessionByTokenHash`, `updateLastUsedAt`
 - `src/repository/indexes.ts` — `ensureIndexes()`: compound index on tasks (`userId`, `deletedAt`, `completedAt`), unique index on `users.email`, text index on tasks, unique indexes on `invitations.tokenHash` and `sessions.tokenHash`
-- `src/api/app.ts` — Express app setup: JSON body parsing, request logging middleware (method, path, status, duration), bearer token auth middleware (hashes token → session lookup → sets `req.userId`), mounts auth routes (unauthenticated) and task routes (authenticated), global error handler (returns JSON 500). Exports `app` without calling `.listen()` (for supertest).
+- `src/api/rate-limit.ts` — `ipLimiter` (10 req/15 min, per-IP, for `/auth`) and `userLimiter` (100 req/min, per-userId, for `/tasks`). Uses `express-rate-limit` with in-memory store. Skipped in test via `NODE_ENV`.
+- `src/api/rate-limit.test.ts` — integration tests for both limiters (2 tests, uses `vi.mock` to override with low limits)
+- `src/api/app.ts` — Express app setup: JSON body parsing, request logging middleware (method, path, status, duration), rate limiting (per-IP on auth, per-user on tasks), bearer token auth middleware (hashes token → session lookup → sets `req.userId`), mounts auth routes (unauthenticated) and task routes (authenticated), global error handler (returns JSON 500). Exports `app` without calling `.listen()` (for supertest).
 - `src/api/auth.ts` — auth routes. `POST /auth/redeem` — accepts `{ key }`, validates invitation, creates session, returns `{ token }`. Enforces 10-session-per-invitation limit.
 - `src/api/tasks.ts` — task routes. Response mapped via `toTaskResponse` (excludes `userId`, `deletedAt`). Endpoints: `GET /tasks/open`, `POST /tasks`, `GET /tasks/:id`, `DELETE /tasks/:id`, `POST /tasks/:id/{complete,reopen,snooze,wake,queue,blockers,blockers/remove}`, `GET /tasks/open/search?q=...`.
 - `src/api/express.d.ts` — declaration merging to add `userId` to Express `Request`

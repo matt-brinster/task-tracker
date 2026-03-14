@@ -125,7 +125,7 @@ A DB gateway abstracts all storage. The rest of the app works only with domain t
 - Response mapping: `toTaskResponse` strips internal fields (`userId`, `deletedAt`) from API responses ✅
 - Global error handler: catches unhandled errors, returns JSON `{ error: "Internal server error" }` with 500 ✅
 - Request logging: middleware logs `method path status duration` to stdout ✅
-- Rate limiting: per-IP (unauthenticated) and per-user (authenticated)
+- Rate limiting: per-IP on `/auth` (10 req/15 min), per-user on `/tasks` (100 req/min). `express-rate-limit` with in-memory store, skipped in test. To horizontally scale (multiple instances), swap to a shared store (e.g. `rate-limit-redis`). ✅
 - **Learning focus:** Node.js async patterns, middleware, request/response lifecycle
 
 Completed endpoints:

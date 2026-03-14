@@ -3,6 +3,7 @@ import type { ErrorRequestHandler } from 'express'
 import { hashToken } from '../domain/crypto.js'
 import { findSessionByTokenHash, updateLastUsedAt } from '../repository/session_repository.js'
 import { authRouter } from './auth.js'
+import { ipLimiter, userLimiter } from './rate-limit.js'
 import { taskRouter } from './tasks.js'
 
 const app = express()
@@ -19,7 +20,7 @@ app.use((req, res, next) => {
 })
 
 // Auth routes are unauthenticated (you need them to get a token)
-app.use('/auth', authRouter)
+app.use('/auth', ipLimiter, authRouter)
 
 // Bearer token auth middleware
 app.use(async (req, res, next) => {
@@ -43,7 +44,7 @@ app.use(async (req, res, next) => {
   next()
 })
 
-app.use('/tasks', taskRouter)
+app.use('/tasks', userLimiter, taskRouter)
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error(err)
