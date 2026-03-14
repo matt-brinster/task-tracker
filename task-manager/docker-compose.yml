@@ -10,5 +10,19 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
 
+  app:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      MONGO_USERNAME: ${MONGO_USERNAME}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_HOST: mongodb
+      MONGO_PORT: "27017"
+      MONGO_DATABASE: ${MONGO_DATABASE}
+      PORT: "3000"
+    depends_on:
+      - mongodb
+
 volumes:
   mongodb_data:

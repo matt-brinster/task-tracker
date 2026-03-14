@@ -175,10 +175,10 @@ When a task is deleted, any other task referencing it as a blocker has a stale e
 ### Phase 5: Local Deployment
 Make the app runnable outside of tests.
 
-- Admin CLI script (`src/admin/provision.ts`) — creates a user + invitation, prints the raw key. Run via `npx tsx src/admin/provision.ts --email matt@example.com`
-- `.env.example` documenting required env vars (`MONGODB_URI`, `PORT`)
-- Dockerfile for the app (multi-stage: install deps, compile TS, run `node dist/index.js`)
-- Add app service to `docker-compose.yml` so `docker compose up` gives MongoDB + API
+- Admin CLI script (`src/admin/provision.ts` + `provision-cli.ts`) — creates a user + invitation, prints the raw key. Run via `npx tsx --env-file=.env src/admin/provision-cli.ts --email matt@example.com` ✅
+- `.env.example` documenting required env vars (`MONGO_USERNAME`, `MONGO_PASSWORD`, `MONGO_DATABASE`, `MONGO_PORT`) ✅
+- Dockerfile for the app (multi-stage: install deps, compile TS, run `node dist/index.js`) ✅
+- Add app service to `docker-compose.yml` so `docker compose up` gives MongoDB + API ✅
 - **Learning focus:** Docker multi-stage builds, environment configuration, production Node.js
 
 ### Phase 6: Frontend

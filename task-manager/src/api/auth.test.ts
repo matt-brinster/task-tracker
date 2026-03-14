@@ -123,7 +123,7 @@ describe('POST /auth/redeem', () => {
       .post('/auth/redeem')
       .send({ key: rawToken })
 
-    const doc = await db().collection('invitations').findOne({ _id: invitation.id })
+    const doc = await db().collection<{ _id: string; sessionCount: number }>('invitations').findOne({ _id: invitation.id })
     expect(doc?.sessionCount).toBe(2)
   })
 })

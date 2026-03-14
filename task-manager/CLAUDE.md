@@ -28,6 +28,7 @@ npm test -- --run  # run tests once and exit
 **Phase 3: Persistence** — complete.
 **Phase 2: REST API Layer** — in progress.
 **Phase 4: Blocker Fan-out on Delete** — complete.
+**Phase 5: Local Deployment** — complete.
 
 Completed:
 - `src/domain/task.ts` — `Task` type and `createTask` factory (uses UUIDv7 for IDs)
@@ -55,6 +56,12 @@ Completed:
 - `src/api/auth.test.ts` — supertest integration tests for redeem endpoint and auth middleware (11 tests)
 - `src/api/app.test.ts` — app-level middleware tests (error handler)
 - `src/index.ts` — entrypoint: runs `ensureIndexes()`, starts Express on `PORT` (default 3000)
+- `src/admin/provision.ts` — `provision(email)` function: creates a user + invitation, returns `{ userId, email, rawToken }`. Throws on duplicate email.
+- `src/admin/provision-cli.ts` — CLI wrapper: parses `--email`, calls `provision()`, prints results. Run via `npx tsx --env-file=.env src/admin/provision-cli.ts --email name@example.com`
+- `src/admin/provision.test.ts` — integration tests for provisioning (6 tests)
+- `Dockerfile` — multi-stage build: deps (production `node_modules`), build (compile TS), final (slim runtime image with `node dist/index.js`)
+- `.dockerignore` — excludes `node_modules`, `dist`, `.env`, `.env.test`, `*.test.ts` from build context
+- `docker-compose.yml` — `mongodb` + `app` services. `docker compose up --build` runs the full stack.
 
 See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
 
