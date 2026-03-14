@@ -68,7 +68,7 @@ There is **no state machine** and no derived "status" field. The domain exposes 
 
 **Soft deletes:** `deleteTask` sets `deletedAt` and scrubs `title`/`details` (PII removal). There is no restore. Deleted task documents remain for blocker reference integrity but are invisible to users.
 
-**Blockers:** `blockers` is a `Blocker[]` — denormalized `{ id, title }` pairs stored as an array (not a set) to allow future priority ranking. Blocker titles are not automatically updated if the source task's title changes. Stale blocker cleanup is deferred.
+**Blockers:** `blockers` is a `Blocker[]` — denormalized `{ id, title }` pairs stored as an array (not a set) to allow future priority ranking. On delete, blocker entries referencing the deleted task are removed from all tasks (inline fan-out). Title fan-out is deferred until a title update endpoint exists. Completion does not auto-remove blockers — the frontend resolves blocker status.
 
 Source lives in `src/`, compiled output goes to `dist/`. The TypeScript config uses `module: "nodenext"`, so imports require explicit `.js` extensions even for `.ts` source files (e.g. `import { foo } from './foo.js'`).
 

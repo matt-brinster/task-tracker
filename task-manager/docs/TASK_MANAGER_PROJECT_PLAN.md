@@ -46,12 +46,12 @@ The frontend receives raw task data and is responsible for:
 
 ### Edge Cases
 - Cycle detection for blocker chains is deferred
-- Stale blocker ID cleanup (blockers pointing to completed tasks) is deferred
-- **Blocker title fan-out:** When a task's title changes, denormalized blocker titles on other tasks become stale. Plan: async fan-out in the repo layer (using `updateMany` with positional `$set`) with a warning log if the affected count is high. Deferred until logging is in place. Long-term, move to async/background fan-out.
+- **Blocker cleanup on delete:** When a task is deleted, its entry is removed from the `blockers` array of all tasks that reference it (immediate fan-out via `updateMany` + `$pull`). See Phase 4.
+- **Blocker cleanup on completion:** Not automatic. The frontend checks whether each blocker is complete and displays accordingly. This preserves the relationship for undo (reopen).
+- **Blocker title fan-out:** When a task's title changes, denormalized blocker titles on other tasks become stale. Deferred — no title update endpoint exists yet. When added, use `updateMany` with positional `$set` to fan out the new title.
 
 ### Snooze Behavior
-- Short term: expired snoozes are resolved lazily on task lookup
-- Scheduled/proactive snooze handling comes in Phase 4
+- Expired snoozes are resolved lazily — the frontend treats `snoozedUntil < now` as "not snoozed". The domain does not proactively clear the field. No server-side scheduling needed for a web app frontend.
 
 ## Authentication
 
@@ -156,15 +156,41 @@ Completed endpoints:
 - **End-to-end test needed:** duplicate email rejection (requires `ensureIndexes()` to have run)
 - **Learning focus:** async I/O, MongoDB driver, document modeling, indexing
 
-### Phase 4: Snooze/Timer Mechanics
-- Proactive snooze handling (wake tasks when snooze expires)
-- Handling server restarts
-- **Learning focus:** Node.js event loop, scheduling, async patterns
+### Phase 4: Blocker Fan-out on Delete
+When a task is deleted, any other task referencing it as a blocker has a stale entry. Fix: immediate fan-out removes the blocker entry from all referencing tasks as part of the delete operation.
+
+- Add `removeBlockerFromAll(userId, blockerId)` to task repository — `updateMany` with `$pull` to remove the blocker from all tasks' `blockers` arrays where `blockers.id` matches
+- Call `removeBlockerFromAll` from the `DELETE /tasks/:id` endpoint after `updateTask`
+- Integration tests: delete a task that is a blocker on another task, verify the blocker entry is removed
+- **Learning focus:** MongoDB `$pull` operator, `updateMany`, fan-out patterns
+
+**Design decisions:**
+- **Inline, not background.** At family scale, an `updateMany` adds single-digit milliseconds to a delete. Background processing adds complexity and failure modes (lost fan-out on crash) without a real performance benefit. Refactorable to background later if needed.
+- **Remove, not mark.** Blocker entries are fully removed rather than updated to `"[deleted]"`. A deleted task is invisible to users; a ghost blocker reference adds no value. The deletion is already recorded on the deleted task's own document.
+- **Title change fan-out deferred.** There is no title update endpoint yet. When one is added, the same `updateMany` pattern applies — update `blockers.$.title` where `blockers.id` matches. The repo function can be generalized at that point.
+- **Completion does not auto-remove blockers.** Completing a task does not remove it from other tasks' blocker lists. The frontend is responsible for checking whether each blocker is complete and displaying accordingly. This preserves the relationship for undo (reopen) and avoids losing information.
+
+### Phase 5: Local Deployment
+Make the app runnable outside of tests.
+
+- Admin CLI script (`src/admin/provision.ts`) — creates a user + invitation, prints the raw key. Run via `npx tsx src/admin/provision.ts --email matt@example.com`
+- `.env.example` documenting required env vars (`MONGODB_URI`, `PORT`)
+- Dockerfile for the app (multi-stage: install deps, compile TS, run `node dist/index.js`)
+- Add app service to `docker-compose.yml` so `docker compose up` gives MongoDB + API
+- **Learning focus:** Docker multi-stage builds, environment configuration, production Node.js
+
+### Phase 6: Frontend
+Web frontend for the task manager.
+
+- **Framework:** React
+- **Interaction model:** buttons (not swipe/gesture)
+- **Scope TBD** — views, layout, and feature set to be decided when Phase 5 is complete
+- **Learning focus:** React fundamentals, client-side state management, API integration
 
 ### Future Possibilities
-- Frontend (framework TBD, gesture/swipe driven for fast interaction)
 - Websockets for real time updates
 - Priority with a priority queue (with starvation prevention)
+- Blocker title fan-out when a title update endpoint is added
 - Additional features as interest dictates
 
 ## Tooling
