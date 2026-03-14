@@ -55,7 +55,17 @@ export async function insertTask(task: Task): Promise<void> {
 }
 
 export async function updateTask(_old: Task, updated: Task): Promise<void> {
+  if (updated.deletedAt !== null) {
+    throw new Error('updateTask cannot soft-delete a task — use softDeleteTask instead')
+  }
   await collection().replaceOne({ _id: updated.id }, toDocument(updated))
+}
+
+export async function softDeleteTask(old: Task, deleted: Task): Promise<void> {
+  await collection().replaceOne({ _id: deleted.id }, toDocument(deleted))
+  // Inline fan-out: remove this task from all blocker lists synchronously.
+  // Fine at family scale; batch in background if this becomes a bottleneck.
+  await removeBlockerFromAll(deleted.userId, deleted.id)
 }
 
 export async function findTaskById(userId: string, taskId: string): Promise<Task | null> {
@@ -69,6 +79,13 @@ export async function findOpenTasks(userId: string, limit = 1000): Promise<Task[
     .limit(limit)
     .toArray()
   return docs.map(fromDocument)
+}
+
+export async function removeBlockerFromAll(userId: string, blockerId: string): Promise<void> {
+  await collection().updateMany(
+    { userId, deletedAt: null, 'blockers.id': blockerId },
+    { $pull: { blockers: { id: blockerId } } },
+  )
 }
 
 export async function searchTasks(userId: string, query: string, limit = 100): Promise<Task[]> {

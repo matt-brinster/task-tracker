@@ -5,7 +5,7 @@ import { client, db } from '../repository/client.js'
 import { ensureIndexes } from '../repository/indexes.js'
 import { createTask } from '../domain/task.js'
 import { completeTask, deleteTask, snoozeTask, addBlockers } from '../domain/task_operations.js'
-import { insertTask, updateTask } from '../repository/task_repository.js'
+import { insertTask, updateTask, softDeleteTask } from '../repository/task_repository.js'
 import { createTestSession } from './test-helpers.js'
 
 let token1: string
@@ -123,7 +123,7 @@ describe('GET /tasks/:id', () => {
   it('returns 404 for soft-deleted tasks', async () => {
     const task = createTask('user-1', 'Doomed task')
     await insertTask(task)
-    await updateTask(task, deleteTask(task, new Date()))
+    await softDeleteTask(task, deleteTask(task, new Date()))
 
     const res = await request(app)
       .get(`/tasks/${task.id}`)
@@ -293,6 +293,62 @@ describe('DELETE /tasks/:id', () => {
       .set(...auth(token2))
 
     expect(res.status).toBe(404)
+  })
+
+  it('removes the deleted task from other tasks\' blockers', async () => {
+    const blocker = createTask('user-1', 'Blocking task')
+    const task = createTask('user-1', 'Blocked task')
+    await insertTask(blocker)
+    await insertTask(task)
+
+    // Add blocker via API
+    await request(app)
+      .post(`/tasks/${task.id}/blockers`)
+      .set(...auth(token1))
+      .send({ id: blocker.id })
+
+    // Delete the blocker task
+    await request(app)
+      .delete(`/tasks/${blocker.id}`)
+      .set(...auth(token1))
+
+    // The blocked task should have no blockers left
+    const getRes = await request(app)
+      .get(`/tasks/${task.id}`)
+      .set(...auth(token1))
+
+    expect(getRes.body.blockers).toHaveLength(0)
+  })
+
+  it('only removes the deleted blocker, leaving others intact', async () => {
+    const blocker1 = createTask('user-1', 'Blocker one')
+    const blocker2 = createTask('user-1', 'Blocker two')
+    const task = createTask('user-1', 'Blocked task')
+    await insertTask(blocker1)
+    await insertTask(blocker2)
+    await insertTask(task)
+
+    // Add both blockers
+    await request(app)
+      .post(`/tasks/${task.id}/blockers`)
+      .set(...auth(token1))
+      .send({ id: blocker1.id })
+    await request(app)
+      .post(`/tasks/${task.id}/blockers`)
+      .set(...auth(token1))
+      .send({ id: blocker2.id })
+
+    // Delete only blocker1
+    await request(app)
+      .delete(`/tasks/${blocker1.id}`)
+      .set(...auth(token1))
+
+    const getRes = await request(app)
+      .get(`/tasks/${task.id}`)
+      .set(...auth(token1))
+
+    expect(getRes.body.blockers).toHaveLength(1)
+    expect(getRes.body.blockers[0].id).toBe(blocker2.id)
   })
 })
 
@@ -571,7 +627,7 @@ describe('GET /tasks/search', () => {
   it('does not return deleted tasks', async () => {
     const task = createTask('user-1', 'Buy groceries')
     await insertTask(task)
-    await updateTask(task, deleteTask(task, new Date()))
+    await softDeleteTask(task, deleteTask(task, new Date()))
 
     const res = await request(app)
       .get('/tasks/open/search?q=groceries')

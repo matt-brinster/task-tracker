@@ -27,6 +27,7 @@ npm test -- --run  # run tests once and exit
 **Phase 1: Core Domain Modeling** — complete.
 **Phase 3: Persistence** — complete.
 **Phase 2: REST API Layer** — in progress.
+**Phase 4: Blocker Fan-out on Delete** — complete.
 
 Completed:
 - `src/domain/task.ts` — `Task` type and `createTask` factory (uses UUIDv7 for IDs)
@@ -34,7 +35,7 @@ Completed:
 - `src/domain/task_operations.test.ts` — full test coverage for all operations above
 - `src/domain/user.ts` — `User` type and `createUser` factory (UUIDv7 IDs, lowercases/trims email)
 - `src/repository/client.ts` — MongoDB client and `db()` helper
-- `src/repository/task_repository.ts` — `insertTask`, `updateTask(old, updated)`, `findTaskById(userId, taskId)`, `findOpenTasks(userId, limit?)`, `searchTasks(userId, query, limit?)`, document mapping (`toDocument`/`fromDocument`). Uses `task.id` as MongoDB `_id`. Queries filter out soft-deleted records by default. Text search also excludes completed tasks.
+- `src/repository/task_repository.ts` — `insertTask`, `updateTask(old, updated)` (throws if `deletedAt` set), `softDeleteTask(old, deleted)` (replaces doc + inline blocker fan-out), `removeBlockerFromAll(userId, blockerId)`, `findTaskById(userId, taskId)`, `findOpenTasks(userId, limit?)`, `searchTasks(userId, query, limit?)`, document mapping (`toDocument`/`fromDocument`). Uses `task.id` as MongoDB `_id`. Queries filter out soft-deleted records by default. Text search also excludes completed tasks.
 - `src/repository/user_repository.ts` — `insertUser`, `findUserById`, `findUserByEmail`
 - `src/domain/crypto.ts` — `generateToken()` (32 random bytes, base64url) and `hashToken()` (SHA-256 hex)
 - `src/domain/invitation.ts` — `Invitation` type and `createInvitation(userId)` factory. Returns `{ invitation, rawToken }` — raw token is handed out, only the hash is stored.
@@ -42,7 +43,7 @@ Completed:
 - `src/domain/auth.test.ts` — tests for crypto, invitation, and session domain (11 tests)
 - `src/repository/invitation_repository.ts` — `insertInvitation`, `findInvitationByTokenHash`, `incrementSessionCount`
 - `src/repository/session_repository.ts` — `insertSession`, `findSessionByTokenHash`, `updateLastUsedAt`
-- `src/repository/indexes.ts` — `ensureIndexes()`: compound index on tasks (`userId`, `deletedAt`, `completedAt`), unique index on `users.email`, text index on tasks, unique indexes on `invitations.tokenHash` and `sessions.tokenHash`
+- `src/repository/indexes.ts` — `ensureIndexes()`: compound index on tasks (`userId`, `deletedAt`, `completedAt`), sparse multikey index on tasks (`userId`, `blockers.id`), unique index on `users.email`, text index on tasks, unique indexes on `invitations.tokenHash` and `sessions.tokenHash`
 - `src/api/rate-limit.ts` — `ipLimiter` (10 req/15 min, per-IP, for `/auth`) and `userLimiter` (100 req/min, per-userId, for `/tasks`). Uses `express-rate-limit` with in-memory store. Skipped in test via `NODE_ENV`.
 - `src/api/rate-limit.test.ts` — integration tests for both limiters (2 tests, uses `vi.mock` to override with low limits)
 - `src/api/app.ts` — Express app setup: JSON body parsing, request logging middleware (method, path, status, duration), rate limiting (per-IP on auth, per-user on tasks), bearer token auth middleware (hashes token → session lookup → sets `req.userId`), mounts auth routes (unauthenticated) and task routes (authenticated), global error handler (returns JSON 500). Exports `app` without calling `.listen()` (for supertest).
@@ -50,7 +51,7 @@ Completed:
 - `src/api/tasks.ts` — task routes. Response mapped via `toTaskResponse` (excludes `userId`, `deletedAt`). Endpoints: `GET /tasks/open`, `POST /tasks`, `GET /tasks/:id`, `DELETE /tasks/:id`, `POST /tasks/:id/{complete,reopen,snooze,wake,queue,blockers,blockers/remove}`, `GET /tasks/open/search?q=...`.
 - `src/api/express.d.ts` — declaration merging to add `userId` to Express `Request`
 - `src/api/test-helpers.ts` — `createTestSession(userId)` — inserts a session and returns raw bearer token for use in tests
-- `src/api/tasks.test.ts` — supertest integration tests for all task endpoints (67 tests, bearer token auth)
+- `src/api/tasks.test.ts` — supertest integration tests for all task endpoints (69 tests, bearer token auth)
 - `src/api/auth.test.ts` — supertest integration tests for redeem endpoint and auth middleware (11 tests)
 - `src/api/app.test.ts` — app-level middleware tests (error handler)
 - `src/index.ts` — entrypoint: runs `ensureIndexes()`, starts Express on `PORT` (default 3000)

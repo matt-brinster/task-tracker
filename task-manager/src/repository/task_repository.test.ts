@@ -3,7 +3,7 @@ import { client } from './client.js'
 import { db } from './client.js'
 import { createTask } from '../domain/task.js'
 import { completeTask, deleteTask, snoozeTask } from '../domain/task_operations.js'
-import { insertTask, updateTask, findTaskById, findOpenTasks, searchTasks, fromDocument } from './task_repository.js'
+import { insertTask, updateTask, softDeleteTask, findTaskById, findOpenTasks, searchTasks, fromDocument } from './task_repository.js'
 import { ensureIndexes } from './indexes.js'
 import type { TaskDocument } from './task_repository.js'
 
@@ -83,7 +83,7 @@ describe('task repository', () => {
       await insertTask(task)
 
       const deleted = deleteTask(task, new Date('2026-03-10T12:00:00Z'))
-      await updateTask(task, deleted)
+      await softDeleteTask(task, deleted)
 
       const doc = await db().collection<TaskDocument>('tasks').findOne({ _id: task.id })
       expect(doc!.deletedAt).toEqual(new Date('2026-03-10T12:00:00Z'))
@@ -129,7 +129,7 @@ describe('task repository', () => {
       await insertTask(task)
 
       const deleted = deleteTask(task, new Date('2026-03-10T12:00:00Z'))
-      await updateTask(task, deleted)
+      await softDeleteTask(task, deleted)
 
       const found = await findTaskById('user-1', task.id)
       expect(found).toBeNull()
@@ -163,7 +163,7 @@ describe('task repository', () => {
       const task = createTask('user-1', 'Deleted task')
       await insertTask(task)
       const deleted = deleteTask(task, new Date('2026-03-10T12:00:00Z'))
-      await updateTask(task, deleted)
+      await softDeleteTask(task, deleted)
 
       const tasks = await findOpenTasks('user-1')
       expect(tasks).toHaveLength(0)
@@ -248,7 +248,7 @@ describe('task repository', () => {
     it('excludes soft-deleted tasks', async () => {
       const task = createTask('user-1', 'Buy milk')
       await insertTask(task)
-      await updateTask(task, deleteTask(task, new Date()))
+      await softDeleteTask(task, deleteTask(task, new Date()))
 
       const results = await searchTasks('user-1', 'milk')
       expect(results).toHaveLength(0)

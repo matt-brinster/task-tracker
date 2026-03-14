@@ -15,6 +15,11 @@ export async function ensureIndexes(): Promise<void> {
   )
 
   await tasks.createIndex(
+    { userId: 1, 'blockers.id': 1 },
+    { name: 'tasks_userId_blockersId', sparse: true }
+  )
+
+  await tasks.createIndex(
     { userId: 1, title: 'text', details: 'text' },
     { name: 'tasks_text', weights: { title: 2, details: 1 } }
   )

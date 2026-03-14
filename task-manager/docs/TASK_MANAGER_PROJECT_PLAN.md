@@ -156,13 +156,15 @@ Completed endpoints:
 - **End-to-end test needed:** duplicate email rejection (requires `ensureIndexes()` to have run)
 - **Learning focus:** async I/O, MongoDB driver, document modeling, indexing
 
-### Phase 4: Blocker Fan-out on Delete
+### Phase 4: Blocker Fan-out on Delete — complete
 When a task is deleted, any other task referencing it as a blocker has a stale entry. Fix: immediate fan-out removes the blocker entry from all referencing tasks as part of the delete operation.
 
-- Add `removeBlockerFromAll(userId, blockerId)` to task repository — `updateMany` with `$pull` to remove the blocker from all tasks' `blockers` arrays where `blockers.id` matches
-- Call `removeBlockerFromAll` from the `DELETE /tasks/:id` endpoint after `updateTask`
-- Integration tests: delete a task that is a blocker on another task, verify the blocker entry is removed
-- **Learning focus:** MongoDB `$pull` operator, `updateMany`, fan-out patterns
+- `removeBlockerFromAll(userId, blockerId)` in task repository — `updateMany` with `$pull` ✅
+- `softDeleteTask(old, deleted)` in task repository — replaces the document and calls `removeBlockerFromAll` inline ✅
+- `updateTask` throws if `deletedAt` is set — enforces use of `softDeleteTask` for deletes ✅
+- Sparse multikey index on `{ userId, 'blockers.id' }` for efficient fan-out queries ✅
+- Integration tests: blocker removed on delete, only the deleted blocker removed when others exist ✅
+- **Learning focus:** MongoDB `$pull` operator, `updateMany`, fan-out patterns, multikey indexes
 
 **Design decisions:**
 - **Inline, not background.** At family scale, an `updateMany` adds single-digit milliseconds to a delete. Background processing adds complexity and failure modes (lost fan-out on crash) without a real performance benefit. Refactorable to background later if needed.

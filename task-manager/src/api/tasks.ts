@@ -3,7 +3,7 @@ import type { Task } from '../domain/task.js'
 import { createTask } from '../domain/task.js'
 import type { Queue } from '../domain/task.js'
 import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, setQueue, addBlockers, removeBlockers } from '../domain/task_operations.js'
-import { findOpenTasks, findTaskById, insertTask, updateTask, searchTasks } from '../repository/task_repository.js'
+import { findOpenTasks, findTaskById, insertTask, updateTask, softDeleteTask, searchTasks } from '../repository/task_repository.js'
 
 function toTaskResponse(task: Task) {
   return {
@@ -73,7 +73,7 @@ taskRouter.delete('/:id', async (req, res) => {
     return
   }
   const deleted = deleteTask(task, new Date())
-  await updateTask(task, deleted)
+  await softDeleteTask(task, deleted)
   res.status(204).end()
 })
 
