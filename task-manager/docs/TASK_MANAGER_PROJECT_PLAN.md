@@ -55,17 +55,37 @@ The frontend receives raw task data and is responsible for:
 
 ## Authentication
 
-Passwordless magic link flow:
-1. Admin adds user's email to the `users` table directly
-2. User visits app on a new device, enters their email
-3. App checks email exists in `users`, sends a magic link
-4. User clicks link — token is consumed, a long-lived session token is issued for that device
-5. Device stores the session token and sends it as a bearer token on all subsequent requests
+Invitation key flow. Designed for a small number of users (family). No passwords, no email delivery (yet).
 
-### DB Tables (auth)
-- **`users`**: `id`, `email`
-- **`pending_verifications`**: `id`, `email`, `token`, `expires_at` — consumed on use
-- **`sessions`**: `id`, `user_id`, `token_hash`, `created_at`, `last_used_at` — one row per verified device
+### Provisioning (admin)
+1. Admin creates a user with their email: `createUser(email)` → inserts into `users`
+2. Admin creates an invitation linked to that user: `createInvitation(userId)` → generates a random key, stores its hash, returns the raw key
+3. Admin hands the raw key to the person (text, in person, etc.)
+
+### Redeeming (user, new device)
+1. User enters their invitation key on a new device
+2. `POST /auth/redeem` — hash the key, look up the invitation, verify session count < 10
+3. Create a new session (hash a new random token, store it), increment the invitation's session count
+4. Return the raw session token to the device
+5. Device stores the session token and sends it as `Authorization: Bearer <token>` on all subsequent requests
+
+### Auth middleware
+- Extract bearer token from `Authorization` header
+- Hash it, look up the session in `sessions` collection
+- Set `req.userId` from the session, update `lastUsedAt`
+- 401 if missing/invalid
+
+### Design decisions
+- **Invitation key ≠ session token.** The invitation key is a long-lived personal passkey used to create sessions. The session token is per-device. This separation means revoking a session doesn't invalidate the invitation, and vice versa.
+- **10 sessions per invitation.** Prevents abuse while allowing plenty of devices. If a user hits the limit, admin can reset the count or issue a new invitation.
+- **Token hashing.** Both invitation keys and session tokens are stored as hashes (`sha256`). Raw tokens exist only in transit (returned once to the client). A DB leak doesn't compromise active sessions.
+- **No email verification on redeem.** The invitation is tied to a userId, not an email. The user doesn't need to prove email ownership to redeem — possessing the key is sufficient. Email is stored on the user for future magic link support.
+- **Future: magic links.** When email delivery is added, magic links become an alternative way to create a session — the session layer is already built. The invitation key flow can coexist or be retired.
+
+### Collections (auth)
+- **`users`**: `id`, `email` (already exists)
+- **`invitations`**: `id`, `userId`, `tokenHash`, `createdAt`, `sessionCount`
+- **`sessions`**: `id`, `userId`, `tokenHash`, `createdAt`, `lastUsedAt`
 
 ## Storage
 
@@ -74,8 +94,9 @@ Passwordless magic link flow:
 
 ### Collections
 - **`tasks`**: one document per task, `blockerIds` stored as an array field
-- **`users`**: one document per user, `sessions` embedded as an array
-- **`pending_verifications`**: magic link tokens, with a TTL index on `expiresAt` for automatic expiry
+- **`users`**: one document per user
+- **`invitations`**: one document per invitation key, linked to a userId
+- **`sessions`**: one document per device session, linked to a userId
 
 ### Repository Layer
 A DB gateway abstracts all storage. The rest of the app works only with domain types (`Task`, `User`); the repository handles SQL, row mapping, and type conversion (e.g. timestamp strings → `Date`, blocker rows → `Set<string>`).
@@ -95,8 +116,9 @@ A DB gateway abstracts all storage. The rest of the app works only with domain t
 - HTTP framework: **Express** (v5)
 - Testing: **Supertest** integration tests against real MongoDB
 - Routing, validation, error handling ✅
-- Auth middleware (bearer token → session lookup → userId on request)
+- Auth: invitation key redemption + bearer token session middleware
   - Placeholder in place: reads `X-User-Id` header, returns 401 if missing
+  - Next: `POST /auth/redeem`, real bearer token middleware, invitation/session repositories
 - Response mapping: `toTaskResponse` strips internal fields (`userId`, `deletedAt`) from API responses ✅
 - Global error handler: catches unhandled errors, returns JSON `{ error: "Internal server error" }` with 500 ✅
 - Request logging: middleware logs `method path status duration` to stdout ✅
@@ -124,7 +146,8 @@ Completed endpoints:
   - `{ userId: 1, deletedAt: 1, completedAt: 1 }` — primary query: user's incomplete tasks ✅
   - `{ email: 1 }` unique — user lookup by email ✅
   - `{ userId: 1, title: "text", details: "text" }` — full-text search (userId prefix, title weight 2, details weight 1) ✅
-  - TTL index on `pending_verifications.expiresAt` — automatic magic link cleanup
+  - `{ tokenHash: 1 }` unique on `invitations` — invitation key lookup
+  - `{ tokenHash: 1 }` unique on `sessions` — bearer token lookup
 - `ensureIndexes()` uses `createIndex` which is a no-op for identical definitions but errors if the name matches with a different definition. Changing an index shape requires dropping the old one first. Need a migration strategy for production (deferred).
 - **End-to-end test needed:** duplicate email rejection (requires `ensureIndexes()` to have run)
 - **Learning focus:** async I/O, MongoDB driver, document modeling, indexing
