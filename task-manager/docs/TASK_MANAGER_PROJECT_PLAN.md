@@ -94,11 +94,12 @@ A DB gateway abstracts all storage. The rest of the app works only with domain t
 ### Phase 2: REST API Layer — in progress
 - HTTP framework: **Express** (v5)
 - Testing: **Supertest** integration tests against real MongoDB
-- Routing, validation, error handling
+- Routing, validation, error handling ✅
 - Auth middleware (bearer token → session lookup → userId on request)
   - Placeholder in place: reads `X-User-Id` header, returns 401 if missing
-- Response mapping: `toTaskResponse` strips internal fields (`userId`, `deletedAt`) from API responses
-- Request logging
+- Response mapping: `toTaskResponse` strips internal fields (`userId`, `deletedAt`) from API responses ✅
+- Global error handler: catches unhandled errors, returns JSON `{ error: "Internal server error" }` with 500 ✅
+- Request logging: middleware logs `method path status duration` to stdout ✅
 - Rate limiting: per-IP (unauthenticated) and per-user (authenticated)
 - **Learning focus:** Node.js async patterns, middleware, request/response lifecycle
 
@@ -112,8 +113,6 @@ Completed endpoints:
 - `POST /tasks/:id/snooze` — set snoozedUntil (body: `{ until }`) ✅
 - `POST /tasks/:id/wake` — clear snoozedUntil ✅
 - `POST /tasks/:id/queue` — set queue (body: `{ queue }`) ✅
-
-Remaining endpoints:
 - `POST /tasks/:id/blockers` — add blocker (body: `{ id }`, server looks up title) ✅
 - `POST /tasks/:id/blockers/remove` — remove blocker (body: `{ id }`) ✅
 - `GET /tasks/open/search?q=...` — text search (open tasks only) ✅

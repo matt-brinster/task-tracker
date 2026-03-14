@@ -6,6 +6,15 @@ const app = express()
 
 app.use(express.json())
 
+app.use((req, res, next) => {
+  const start = Date.now()
+  res.on('finish', () => {
+    const duration = Date.now() - start
+    console.log(`${req.method} ${req.path} ${res.statusCode} ${duration}ms`)
+  })
+  next()
+})
+
 // Placeholder auth: reads X-User-Id header.
 // Replace with real auth middleware (bearer token → session lookup) later.
 app.use((req, res, next) => {

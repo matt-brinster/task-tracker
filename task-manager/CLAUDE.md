@@ -37,10 +37,11 @@ Completed:
 - `src/repository/task_repository.ts` — `insertTask`, `updateTask(old, updated)`, `findTaskById(userId, taskId)`, `findOpenTasks(userId, limit?)`, `searchTasks(userId, query, limit?)`, document mapping (`toDocument`/`fromDocument`). Uses `task.id` as MongoDB `_id`. Queries filter out soft-deleted records by default. Text search also excludes completed tasks.
 - `src/repository/user_repository.ts` — `insertUser`, `findUserById`, `findUserByEmail`
 - `src/repository/indexes.ts` — `ensureIndexes()`: compound index on tasks (`userId`, `deletedAt`, `completedAt`), unique index on `users.email`, text index on tasks (`userId` prefix, `title` weight 2, `details` weight 1)
-- `src/api/app.ts` — Express app setup: JSON body parsing, placeholder auth middleware (`X-User-Id` header), mounts task routes. Exports `app` without calling `.listen()` (for supertest).
-- `src/api/tasks.ts` — task routes. Response mapped via `toTaskResponse` (excludes `userId`, `deletedAt`). Endpoints: `GET /tasks/open`, `POST /tasks`, `GET /tasks/:id`, `DELETE /tasks/:id`, `POST /tasks/:id/{complete,reopen,snooze,wake,queue}`.
+- `src/api/app.ts` — Express app setup: JSON body parsing, request logging middleware (method, path, status, duration), placeholder auth middleware (`X-User-Id` header), mounts task routes, global error handler (returns JSON 500). Exports `app` without calling `.listen()` (for supertest).
+- `src/api/tasks.ts` — task routes. Response mapped via `toTaskResponse` (excludes `userId`, `deletedAt`). Endpoints: `GET /tasks/open`, `POST /tasks`, `GET /tasks/:id`, `DELETE /tasks/:id`, `POST /tasks/:id/{complete,reopen,snooze,wake,queue,blockers,blockers/remove}`, `GET /tasks/open/search?q=...`.
 - `src/api/express.d.ts` — declaration merging to add `userId` to Express `Request`
-- `src/api/tasks.test.ts` — supertest integration tests for all task endpoints (44 tests)
+- `src/api/tasks.test.ts` — supertest integration tests for all task endpoints (68 tests)
+- `src/api/app.test.ts` — app-level middleware tests (error handler)
 - `src/index.ts` — entrypoint: runs `ensureIndexes()`, starts Express on `PORT` (default 3000)
 
 See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
