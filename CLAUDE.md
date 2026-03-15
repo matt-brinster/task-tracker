@@ -14,10 +14,16 @@ We are pair programming. The user is at the keyboard; Claude is the navigator. T
 ## Commands
 
 ```bash
+# API
 npm run build -w api      # compile TypeScript (outputs to packages/api/dist/)
 npm run clean -w api      # remove packages/api/dist/
 npm test -w api           # run tests (Vitest, watch mode); requires packages/api/.env.test
 npm test -w api -- --run  # run tests once and exit
+
+# Web (frontend)
+npm run dev -w web        # Vite dev server at localhost:5173 (proxies /api to localhost:3000)
+npm run build -w web      # type-check + bundle into packages/web/dist/
+npm run lint -w web       # ESLint
 ```
 
 **Test framework: Vitest.** Tests load `packages/api/.env.test` via `node --env-file=.env.test`. Copy `packages/api/.env.test.example` to `packages/api/.env.test` to get started. Integration tests require MongoDB running (`docker compose up -d`).
@@ -36,7 +42,7 @@ npx tsx --env-file=packages/api/.env src/admin/provision-cli.ts --email name@exa
 **Phase 4: Blocker Fan-out on Delete** — complete.
 **Phase 5: Local Deployment** — complete.
 **Phase 5.5: Monorepo Restructure** — complete.
-**Phase 6: Frontend** — planned.
+**Phase 6: Frontend** — in progress (6a scaffolding complete).
 
 Completed:
 - `packages/api/src/domain/task.ts` — `Task` type and `createTask` factory (uses UUIDv7 for IDs)
@@ -70,6 +76,16 @@ Completed:
 - `Dockerfile` — multi-stage build: deps (production `node_modules`), build (compile TS into `packages/api/dist/`), final (slim runtime image with `node packages/api/dist/index.js`)
 - `.dockerignore` — excludes `node_modules`, `dist`, `.env`, `.env.test`, `*.test.ts` from build context
 - `docker-compose.yml` — `mongodb` + `app` services. `docker compose up --build` runs the full stack.
+- `.gitattributes` — normalizes line endings to LF in the repo (fixes CRLF/LF issues between Windows and WSL)
+
+Phase 6a (frontend scaffolding):
+- `packages/web/` — Vite + React + TypeScript scaffold
+- `packages/web/vite.config.ts` — Vite config with `@tailwindcss/vite` plugin and dev proxy (`/api` → `http://localhost:3000`)
+- `packages/web/src/index.css` — Tailwind CSS v4 via `@import "tailwindcss"`
+- `packages/web/src/App.tsx` — placeholder hello world with Tailwind classes
+- `packages/web/src/main.tsx` — React entrypoint, renders `<App />` into `#root`
+- `packages/web/index.html` — HTML shell, loads `main.tsx` as ES module
+- Key deps: `react`, `react-dom`, `tailwindcss`, `@tailwindcss/vite`, `@tanstack/react-query`, `react-router`, `vite@7`, `@vitejs/plugin-react@4`
 
 See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
 
@@ -81,7 +97,7 @@ See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
   - `src/repository/` — persistence
   - `src/routes/` — HTTP layer (Express route handlers, middleware)
   - `src/admin/` — CLI tooling (provisioning)
-- `packages/web/` — the frontend (Phase 6, planned): React SPA, Vite, React Router, TanStack Query, Tailwind CSS
+- `packages/web/` — the frontend (Phase 6a complete): React SPA, Vite 7, React Router, TanStack Query, Tailwind CSS v4
 
 There is **no state machine** and no derived "status" field. The domain exposes raw data; the API and UI decide how to present it. Domain predicates may be added as needed (e.g. `isComplete`, `isSnoozed`), but status display logic belongs to the presentation layer.
 

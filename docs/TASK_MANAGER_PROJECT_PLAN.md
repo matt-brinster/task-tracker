@@ -217,7 +217,13 @@ Web frontend for the task manager. Single-page application — client-side routi
   - Task actions: complete, reopen, snooze, wake, change queue, add/remove blocker
   - Search
 - **Sub-phases:**
-  - **6a: Scaffolding** — `npm create vite` into `packages/web/`, wire up workspace, install Tailwind + TanStack Query + React Router, Vite dev server proxies `/api` to Express backend (avoids CORS during dev). Verify: `npm run dev -w web` shows a hello world page.
+  - **6a: Scaffolding** — complete. ✅
+    - `npm create vite` into `packages/web/`, wired up workspace
+    - Installed Tailwind CSS v4 (`tailwindcss` + `@tailwindcss/vite`), TanStack Query, React Router
+    - Downgraded Vite to v7 and `@vitejs/plugin-react` to v4 (Vite 8 incompatible with `@tailwindcss/vite`)
+    - Vite dev server proxies `/api` to Express backend (`localhost:3000`)
+    - Stripped Vite boilerplate, replaced with hello world
+    - `npm run dev -w web` starts at `localhost:5173`, `npm run build -w web` produces `dist/`
   - **6b: Auth** — Login page (text input for invitation key, submit button), call `POST /auth/redeem`, store token in `localStorage`, API client module that attaches `Bearer` header to all requests, redirect to login on 401. Verify: can log in and see a placeholder authenticated page.
   - **6c: Task list (read-only)** — Main view fetches `GET /tasks/open` via TanStack Query, filter into sections (actionable / snoozed / blocked), display task cards (title, queue, blocker count, snooze date), resolve blocker status (check each blocker's `completedAt`). Verify: logged-in user sees tasks organized into sections.
   - **6d: Task creation** — Form with title (required) and details (optional), `POST /tasks`, invalidate task list query on success. Verify: can create a task and see it appear.
@@ -238,7 +244,7 @@ Web frontend for the task manager. Single-page application — client-side routi
 - **Node.js:** Installed inside WSL; Node 22 LTS via nvm
 - **Package manager:** npm (comes with Node)
 - **Version control:** Git (configured inside WSL)
-- **Project location:** WSL filesystem (~/dev/task-manager), not /mnt/c/, for performance and file watching reliability
+- **Project location:** `/mnt/c/dev/task-tracker` (Windows filesystem via WSL). `.gitattributes` normalizes line endings to LF.
 
 ## Learning Approach
 - Prioritize understanding over shipping
