@@ -1,4 +1,4 @@
-import app from './api/app.js'
+import app from './routes/app.js'
 import { ensureIndexes } from './repository/indexes.js'
 
 const port = process.env['PORT'] ?? 3000
