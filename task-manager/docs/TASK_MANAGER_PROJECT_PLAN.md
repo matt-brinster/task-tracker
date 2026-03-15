@@ -181,13 +181,50 @@ Make the app runnable outside of tests.
 - Add app service to `docker-compose.yml` so `docker compose up` gives MongoDB + API ✅
 - **Learning focus:** Docker multi-stage builds, environment configuration, production Node.js
 
-### Phase 6: Frontend
-Web frontend for the task manager.
+### Phase 5.5: Monorepo Restructure
+Reorganize the repo into npm workspaces to support both the API and the upcoming frontend as separate packages.
 
-- **Framework:** React
+- Convert to npm workspaces: root `package.json` with `"workspaces": ["packages/*"]`
+- Move existing backend into `packages/api/`:
+  - `src/domain/` → `packages/api/src/domain/`
+  - `src/repository/` → `packages/api/src/repository/`
+  - `src/api/` → `packages/api/src/routes/` (rename to avoid `packages/api/src/api/` stutter)
+  - `src/admin/` → `packages/api/src/admin/`
+  - `src/index.ts` → `packages/api/src/index.ts`
+- `packages/api/` gets its own `package.json`, `tsconfig.json`, and `vitest.config.ts`
+- Root keeps: `docker-compose.yml`, `Dockerfile`, `.dockerignore`, `.env.example`, `.env.test.example`, `CLAUDE.md`, `docs/`
+- Update all imports from `../api/` or `./api/` → `../routes/` or `./routes/`
+- Update Dockerfile `COPY` paths and build commands for the new layout
+- Update provision CLI run command for new path
+- Verify: `npm run build -w api`, `npm test -w api`, `docker compose up --build` all work
+- **Learning focus:** npm workspaces, monorepo structure, project reorganization
+
+### Phase 6: Frontend
+Web frontend for the task manager. Single-page application — client-side routing, no SSR, no BFF. The frontend calls the API directly; builds to static files (HTML, JS, CSS).
+
+- **Location:** `packages/web/`
+- **Stack:**
+  - React (via Vite) — SPA, TypeScript
+  - React Router — client-side routing
+  - TanStack Query — server state management (caching, refetching, loading/error states)
+  - Tailwind CSS — styling
 - **Interaction model:** buttons (not swipe/gesture)
-- **Scope TBD** — views, layout, and feature set to be decided when Phase 5 is complete
-- **Learning focus:** React fundamentals, client-side state management, API integration
+- **Auth:** Login screen accepts invitation key, calls `POST /auth/redeem`, stores returned bearer token in `localStorage`. Token sent as `Authorization: Bearer <token>` header on all API calls.
+- **Features (first pass):**
+  - Login screen (enter invitation key → redeem → store token)
+  - Main view: open tasks filtered into sections (actionable / snoozed / blocked)
+  - Create task
+  - Task actions: complete, reopen, snooze, wake, change queue, add/remove blocker
+  - Search
+- **Sub-phases:**
+  - **6a: Scaffolding** — `npm create vite` into `packages/web/`, wire up workspace, install Tailwind + TanStack Query + React Router, Vite dev server proxies `/api` to Express backend (avoids CORS during dev). Verify: `npm run dev -w web` shows a hello world page.
+  - **6b: Auth** — Login page (text input for invitation key, submit button), call `POST /auth/redeem`, store token in `localStorage`, API client module that attaches `Bearer` header to all requests, redirect to login on 401. Verify: can log in and see a placeholder authenticated page.
+  - **6c: Task list (read-only)** — Main view fetches `GET /tasks/open` via TanStack Query, filter into sections (actionable / snoozed / blocked), display task cards (title, queue, blocker count, snooze date), resolve blocker status (check each blocker's `completedAt`). Verify: logged-in user sees tasks organized into sections.
+  - **6d: Task creation** — Form with title (required) and details (optional), `POST /tasks`, invalidate task list query on success. Verify: can create a task and see it appear.
+  - **6e: Task actions** — Buttons on each task: complete, reopen, snooze (with date picker), wake, move to backlog/todo, add blocker (pick from open tasks), remove blocker. Each calls `POST /tasks/:id/...`. Optimistic updates or query invalidation via TanStack Query. Verify: all actions work and list updates.
+  - **6f: Search** — Search input, calls `GET /tasks/open/search?q=...`, debounced or search-on-submit, results in same card format. Verify: search returns and displays results.
+  - **6g: Polish & deploy** — Error states, loading indicators, empty states. Build static output, update Dockerfile / docker-compose to serve it (nginx or serve from Express). Verify: `docker compose up --build` runs full stack with frontend.
+- **Learning focus:** React fundamentals, client-side routing, server state management, API integration
 
 ### Future Possibilities
 - Websockets for real time updates

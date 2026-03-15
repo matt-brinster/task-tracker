@@ -13,6 +13,8 @@ We are pair programming. The user is at the keyboard; Claude is the navigator. T
 
 ## Commands
 
+> **Note:** These commands reflect the current (pre-restructure) layout. After Phase 5.5, commands will use workspace syntax (e.g. `npm run build -w api`, `npm test -w api`).
+
 ```bash
 npm run build      # compile TypeScript (outputs to dist/)
 npm run clean      # remove dist/
@@ -25,10 +27,12 @@ npm test -- --run  # run tests once and exit
 ## Project Status
 
 **Phase 1: Core Domain Modeling** — complete.
-**Phase 3: Persistence** — complete.
 **Phase 2: REST API Layer** — in progress.
+**Phase 3: Persistence** — complete.
 **Phase 4: Blocker Fan-out on Delete** — complete.
 **Phase 5: Local Deployment** — complete.
+**Phase 5.5: Monorepo Restructure** — planned (next).
+**Phase 6: Frontend** — planned.
 
 Completed:
 - `src/domain/task.ts` — `Task` type and `createTask` factory (uses UUIDv7 for IDs)
@@ -67,10 +71,15 @@ See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
 
 ## Architecture
 
-Layered architecture:
-- `src/domain/` — core types and pure functions (no I/O, no framework dependencies)
-- `src/repository/` — persistence (Phase 3)
-- `src/api/` — HTTP layer (Phase 2)
+**Monorepo** using npm workspaces (Phase 5.5, in progress):
+- `packages/api/` — the backend (Express API server)
+  - `src/domain/` — core types and pure functions (no I/O, no framework dependencies)
+  - `src/repository/` — persistence
+  - `src/routes/` — HTTP layer (Express route handlers, middleware)
+  - `src/admin/` — CLI tooling (provisioning)
+- `packages/web/` — the frontend (Phase 6): React SPA, Vite, React Router, TanStack Query, Tailwind CSS
+
+> **Current state:** All source is still in the top-level `src/` directory with `src/api/` for the HTTP layer. The restructure will move everything into `packages/api/` and rename `src/api/` → `src/routes/`.
 
 There is **no state machine** and no derived "status" field. The domain exposes raw data; the API and UI decide how to present it. Domain predicates may be added as needed (e.g. `isComplete`, `isSnoozed`), but status display logic belongs to the presentation layer.
 
@@ -78,7 +87,7 @@ There is **no state machine** and no derived "status" field. The domain exposes 
 
 **Blockers:** `blockers` is a `Blocker[]` — denormalized `{ id, title }` pairs stored as an array (not a set) to allow future priority ranking. On delete, blocker entries referencing the deleted task are removed from all tasks (inline fan-out). Title fan-out is deferred until a title update endpoint exists. Completion does not auto-remove blockers — the frontend resolves blocker status.
 
-Source lives in `src/`, compiled output goes to `dist/`. The TypeScript config uses `module: "nodenext"`, so imports require explicit `.js` extensions even for `.ts` source files (e.g. `import { foo } from './foo.js'`).
+The TypeScript config uses `module: "nodenext"`, so imports require explicit `.js` extensions even for `.ts` source files (e.g. `import { foo } from './foo.js'`). Each package has its own `tsconfig.json`; compiled output goes to `dist/` within the package.
 
 ## TypeScript Configuration
 
