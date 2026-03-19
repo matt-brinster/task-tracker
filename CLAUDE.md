@@ -24,6 +24,8 @@ npm test -w api -- --run  # run tests once and exit
 npm run dev -w web        # Vite dev server at localhost:5173 (proxies /api to localhost:3000)
 npm run build -w web      # type-check + bundle into packages/web/dist/
 npm run lint -w web       # ESLint
+npm test -w web           # run tests (Vitest, watch mode)
+npm test -w web -- --run  # run tests once and exit
 ```
 
 **Test framework: Vitest.** Tests load `packages/api/.env.test` via `node --env-file=.env.test`. Copy `packages/api/.env.test.example` to `packages/api/.env.test` to get started. Integration tests require MongoDB running (`docker compose up -d`).
@@ -42,7 +44,7 @@ npx tsx --env-file=packages/api/.env src/admin/provision-cli.ts --email name@exa
 **Phase 4: Blocker Fan-out on Delete** — complete.
 **Phase 5: Local Deployment** — complete.
 **Phase 5.5: Monorepo Restructure** — complete.
-**Phase 6: Frontend** — in progress (6a scaffolding complete).
+**Phase 6: Frontend** — in progress (6a scaffolding complete, 6b auth complete).
 
 Completed:
 - `packages/api/src/domain/task.ts` — `Task` type and `createTask` factory (uses UUIDv7 for IDs)
@@ -87,6 +89,19 @@ Phase 6a (frontend scaffolding):
 - `packages/web/index.html` — HTML shell, loads `main.tsx` as ES module
 - Key deps: `react`, `react-dom`, `tailwindcss`, `@tailwindcss/vite`, `@tanstack/react-query`, `react-router`, `vite@7`, `@vitejs/plugin-react@4`
 
+Phase 6b (auth):
+- `packages/web/src/auth.ts` — `getToken()`, `setToken()`, `clearToken()` wrapping `localStorage`
+- `packages/web/src/api.ts` — `fetchApi(path, options)` attaches `Bearer` header; clears token and reloads on 401. `redeemInvitation(key)` calls `POST /auth/redeem`.
+- `packages/web/src/App.tsx` — conditional rendering based on auth state (no routing — everything at `/`). `RequireAuth` wrapper checks for token.
+- `packages/web/src/pages/LoginPage.tsx` — invitation key form, calls `redeemInvitation`, stores token on success
+- `packages/web/src/pages/HomePage.tsx` — placeholder authenticated page with logout button. No tests yet (deferred until it has real content in 6c).
+- `packages/web/src/auth.test.ts` — tests for token helpers (4 tests)
+- `packages/web/src/api.test.ts` — tests for fetchApi header attachment and 401 handling (4 tests)
+- `packages/web/src/App.test.tsx` — tests for auth guard rendering (4 tests)
+- `packages/web/src/pages/LoginPage.test.tsx` — tests for login form submission and error display (4 tests)
+- `packages/web/vitest.config.ts` — Vitest config with jsdom environment (no react plugin needed — vitest uses esbuild for JSX)
+- `packages/web/src/test-setup.ts` — React Testing Library cleanup between tests
+
 See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
 
 ## Architecture
@@ -97,7 +112,7 @@ See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
   - `src/repository/` — persistence
   - `src/routes/` — HTTP layer (Express route handlers, middleware)
   - `src/admin/` — CLI tooling (provisioning)
-- `packages/web/` — the frontend (Phase 6a complete): React SPA, Vite 7, React Router, TanStack Query, Tailwind CSS v4
+- `packages/web/` — the frontend (Phase 6b complete): React SPA, Vite 7, TanStack Query, Tailwind CSS v4. No client-side routing — all UI renders at `/`, using conditional rendering based on auth state. Mobile-first layout: UI constrained to a narrow centered column (`max-w-md`) on all screen sizes.
 
 There is **no state machine** and no derived "status" field. The domain exposes raw data; the API and UI decide how to present it. Domain predicates may be added as needed (e.g. `isComplete`, `isSnoozed`), but status display logic belongs to the presentation layer.
 

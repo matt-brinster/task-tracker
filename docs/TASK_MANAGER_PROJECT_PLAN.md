@@ -209,6 +209,7 @@ Web frontend for the task manager. Single-page application — client-side routi
   - TanStack Query — server state management (caching, refetching, loading/error states)
   - Tailwind CSS — styling
 - **Interaction model:** buttons (not swipe/gesture)
+- **Layout:** Mobile-first. The UI is constrained to a narrow column (`max-w-md`, 448px) centered on desktop, so the experience is identical on phone and desktop. No responsive breakpoints or desktop-specific layouts.
 - **Auth:** Login screen accepts invitation key, calls `POST /auth/redeem`, stores returned bearer token in `localStorage`. Token sent as `Authorization: Bearer <token>` header on all API calls.
 - **Features (first pass):**
   - Login screen (enter invitation key → redeem → store token)
@@ -224,7 +225,13 @@ Web frontend for the task manager. Single-page application — client-side routi
     - Vite dev server proxies `/api` to Express backend (`localhost:3000`)
     - Stripped Vite boilerplate, replaced with hello world
     - `npm run dev -w web` starts at `localhost:5173`, `npm run build -w web` produces `dist/`
-  - **6b: Auth** — Login page (text input for invitation key, submit button), call `POST /auth/redeem`, store token in `localStorage`, API client module that attaches `Bearer` header to all requests, redirect to login on 401. Verify: can log in and see a placeholder authenticated page.
+  - **6b: Auth** — complete. ✅
+    - Login page (invitation key input, submit), calls `POST /auth/redeem`, stores token in `localStorage`
+    - API client (`api.ts`) attaches `Bearer` header to all requests, clears token and reloads on 401
+    - Auth helpers (`auth.ts`) wrap `localStorage` for token get/set/clear
+    - No client-side routing — conditional rendering at `/` based on auth state (simpler than React Router for current needs)
+    - HomePage placeholder with logout button (no tests yet — deferred until real content in 6c)
+    - 16 tests across auth, api, App, and LoginPage
   - **6c: Task list (read-only)** — Main view fetches `GET /tasks/open` via TanStack Query, filter into sections (actionable / snoozed / blocked), display task cards (title, queue, blocker count, snooze date), resolve blocker status (check each blocker's `completedAt`). Verify: logged-in user sees tasks organized into sections.
   - **6d: Task creation** — Form with title (required) and details (optional), `POST /tasks`, invalidate task list query on success. Verify: can create a task and see it appear.
   - **6e: Task actions** — Buttons on each task: complete, reopen, snooze (with date picker), wake, move to backlog/todo, add blocker (pick from open tasks), remove blocker. Each calls `POST /tasks/:id/...`. Optimistic updates or query invalidation via TanStack Query. Verify: all actions work and list updates.
