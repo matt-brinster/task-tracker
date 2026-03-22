@@ -28,7 +28,7 @@ describe('App auth guard', () => {
 
   it('shows task list when token exists', async () => {
     setToken('valid-token')
-    vi.spyOn(api, 'fetchOpenTasks').mockResolvedValue([])
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue([])
 
     renderWithQuery(<App />)
 

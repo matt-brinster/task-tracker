@@ -14,6 +14,7 @@ function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
     queue: 'todo',
     completedAt: null,
     snoozedUntil: null,
+    archivedAt: null,
     blockers: [],
     ...overrides,
   }

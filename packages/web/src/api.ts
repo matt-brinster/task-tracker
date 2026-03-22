@@ -35,6 +35,11 @@ export async function fetchApi(path: string, options: RequestInit = {}): Promise
     throw new ApiError(401, 'Unauthorized')
   }
 
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ error: 'Unknown error' })) as { error: string }
+    throw new ApiError(response.status, body.error)
+  }
+
   return response
 }
 
@@ -43,24 +48,29 @@ export async function fetchOpenTasks(): Promise<TaskResponse[]> {
   return response.json() as Promise<TaskResponse[]>
 }
 
+export async function fetchActiveTasks(): Promise<TaskResponse[]> {
+  const response = await fetchApi('/tasks/active')
+  return response.json() as Promise<TaskResponse[]>
+}
+
+export async function archiveTasks(taskIds: string[]): Promise<{ archivedCount: number }> {
+  const response = await fetchApi('/tasks/archive', {
+    method: 'POST',
+    body: JSON.stringify({ taskIds }),
+  })
+  return response.json() as Promise<{ archivedCount: number }>
+}
+
 export async function createTask(title: string, details: string = ''): Promise<TaskResponse> {
   const response = await fetchApi('/tasks', {
     method: 'POST',
     body: JSON.stringify({ title, details }),
   })
-  if (!response.ok) {
-    const body = await response.json() as { error: string }
-    throw new ApiError(response.status, body.error)
-  }
   return response.json() as Promise<TaskResponse>
 }
 
 export async function fetchTask(id: string): Promise<TaskResponse> {
   const response = await fetchApi(`/tasks/${id}`)
-  if (!response.ok) {
-    const body = await response.json() as { error: string }
-    throw new ApiError(response.status, body.error)
-  }
   return response.json() as Promise<TaskResponse>
 }
 

@@ -3,7 +3,7 @@ import type { Task } from '../domain/task.js'
 import { createTask } from '../domain/task.js'
 import type { Queue } from '../domain/task.js'
 import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, setQueue, addBlockers, removeBlockers } from '../domain/task_operations.js'
-import { findOpenTasks, findTaskById, insertTask, updateTask, softDeleteTask, searchTasks } from '../repository/task_repository.js'
+import { findOpenTasks, findActiveTasks, findTaskById, insertTask, updateTask, softDeleteTask, searchTasks, archiveTasks } from '../repository/task_repository.js'
 
 function toTaskResponse(task: Task) {
   return {
@@ -13,6 +13,7 @@ function toTaskResponse(task: Task) {
     queue: task.queue,
     completedAt: task.completedAt,
     snoozedUntil: task.snoozedUntil,
+    archivedAt: task.archivedAt,
     blockers: task.blockers,
   }
 }
@@ -22,6 +23,21 @@ export const taskRouter = Router()
 taskRouter.get('/open', async (req, res) => {
   const tasks = await findOpenTasks(req.userId)
   res.json(tasks.map(toTaskResponse))
+})
+
+taskRouter.get('/active', async (req, res) => {
+  const tasks = await findActiveTasks(req.userId)
+  res.json(tasks.map(toTaskResponse))
+})
+
+taskRouter.post('/archive', async (req, res) => {
+  const { taskIds } = req.body
+  if (!Array.isArray(taskIds) || taskIds.length === 0 || !taskIds.every(id => typeof id === 'string')) {
+    res.status(400).json({ error: 'taskIds must be a non-empty array of strings' })
+    return
+  }
+  const archivedCount = await archiveTasks(req.userId, taskIds, new Date())
+  res.json({ archivedCount })
 })
 
 taskRouter.post('/', async (req, res) => {

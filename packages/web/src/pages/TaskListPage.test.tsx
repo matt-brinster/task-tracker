@@ -14,6 +14,7 @@ function makeTasks(...titles: string[]): TaskResponse[] {
     queue: 'todo' as const,
     completedAt: null,
     snoozedUntil: null,
+    archivedAt: null,
     blockers: [],
   }))
 }
@@ -41,7 +42,7 @@ describe('TaskListPage', () => {
   })
 
   it('displays loading state initially', () => {
-    vi.spyOn(api, 'fetchOpenTasks').mockReturnValue(new Promise(() => {}))
+    vi.spyOn(api, 'fetchActiveTasks').mockReturnValue(new Promise(() => {}))
 
     renderWithQuery(
       <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
@@ -51,7 +52,7 @@ describe('TaskListPage', () => {
   })
 
   it('displays tasks after loading', async () => {
-    vi.spyOn(api, 'fetchOpenTasks').mockResolvedValue(makeTasks('Buy milk', 'Walk dog'))
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(makeTasks('Buy milk', 'Walk dog'))
 
     renderWithQuery(
       <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
@@ -62,7 +63,7 @@ describe('TaskListPage', () => {
   })
 
   it('displays (unnamed) for tasks with empty title', async () => {
-    vi.spyOn(api, 'fetchOpenTasks').mockResolvedValue(makeTasks(''))
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(makeTasks(''))
 
     renderWithQuery(
       <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
@@ -73,7 +74,7 @@ describe('TaskListPage', () => {
 
   it('calls onTaskClick when task title is clicked', async () => {
     const user = userEvent.setup()
-    vi.spyOn(api, 'fetchOpenTasks').mockResolvedValue(makeTasks('Buy milk'))
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(makeTasks('Buy milk'))
 
     renderWithQuery(
       <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
@@ -87,7 +88,7 @@ describe('TaskListPage', () => {
 
   it('calls onNewTask when + Task is clicked', async () => {
     const user = userEvent.setup()
-    vi.spyOn(api, 'fetchOpenTasks').mockResolvedValue([])
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue([])
 
     renderWithQuery(
       <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
@@ -101,7 +102,7 @@ describe('TaskListPage', () => {
 
   it('completes a task when checkbox is clicked', async () => {
     const user = userEvent.setup()
-    vi.spyOn(api, 'fetchOpenTasks').mockResolvedValue(makeTasks('Buy milk'))
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(makeTasks('Buy milk'))
     vi.spyOn(api, 'completeTask').mockResolvedValue({
       ...makeTasks('Buy milk')[0]!,
       completedAt: new Date().toISOString(),
@@ -120,7 +121,7 @@ describe('TaskListPage', () => {
   it('filters out snoozed tasks', async () => {
     const tasks = makeTasks('Active task', 'Snoozed task')
     tasks[1]!.snoozedUntil = new Date(Date.now() + 86400000).toISOString()
-    vi.spyOn(api, 'fetchOpenTasks').mockResolvedValue(tasks)
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
     renderWithQuery(
       <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
@@ -133,7 +134,7 @@ describe('TaskListPage', () => {
   it('filters out blocked tasks', async () => {
     const tasks = makeTasks('Active task', 'Blocked task')
     tasks[1]!.blockers = [{ id: 'other', title: 'Other task' }]
-    vi.spyOn(api, 'fetchOpenTasks').mockResolvedValue(tasks)
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
     renderWithQuery(
       <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
@@ -144,7 +145,7 @@ describe('TaskListPage', () => {
   })
 
   it('shows error state when fetch fails', async () => {
-    vi.spyOn(api, 'fetchOpenTasks').mockRejectedValue(new Error('Network error'))
+    vi.spyOn(api, 'fetchActiveTasks').mockRejectedValue(new Error('Network error'))
 
     renderWithQuery(
       <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
@@ -155,7 +156,7 @@ describe('TaskListPage', () => {
 
   it('calls onLogout and clears token when Logout is clicked', async () => {
     const user = userEvent.setup()
-    vi.spyOn(api, 'fetchOpenTasks').mockResolvedValue([])
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue([])
 
     renderWithQuery(
       <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />

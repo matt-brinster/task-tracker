@@ -1,6 +1,5 @@
-import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchOpenTasks, completeTask, reopenTask } from '../api.ts'
+import { fetchActiveTasks, completeTask, reopenTask, archiveTasks } from '../api.ts'
 import type { TaskResponse } from '../types.ts'
 import { clearToken } from '../auth.ts'
 
@@ -12,39 +11,45 @@ type Props = {
 
 export default function TaskListPage({ onLogout, onTaskClick, onNewTask }: Props) {
   const queryClient = useQueryClient()
-  {/* todo: hold an array of completed tasks?*/}
-  const [justCompleted, setJustCompleted] = useState<Set<string>>(() => new Set())
 
   const { data: tasks, isLoading, error } = useQuery({
-    queryKey: ['tasks', 'open'],
-    queryFn: fetchOpenTasks,
+    queryKey: ['tasks', 'active'],
+    queryFn: fetchActiveTasks,
   })
 
   const completeMutation = useMutation({
     mutationFn: completeTask,
-    onSuccess: (_data, id) => {
-      setJustCompleted(prev => new Set(prev).add(id))
-      queryClient.invalidateQueries({ queryKey: ['tasks', id] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
     },
   })
 
   const reopenMutation = useMutation({
     mutationFn: reopenTask,
-    onSuccess: (_data, id) => {
-      setJustCompleted(prev => {
-        const next = new Set(prev)
-        next.delete(id)
-        return next
-      })
-      queryClient.invalidateQueries({ queryKey: ['tasks', id] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    },
+  })
+
+  const archiveMutation = useMutation({
+    mutationFn: archiveTasks,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
     },
   })
 
   function handleCheckbox(task: TaskResponse) {
-    if (justCompleted.has(task.id)) {
+    if (task.completedAt) {
       reopenMutation.mutate(task.id)
     } else {
       completeMutation.mutate(task.id)
+    }
+  }
+
+  function handleArchiveCompleted() {
+    const completedIds = completedTasks.map(t => t.id)
+    if (completedIds.length > 0) {
+      archiveMutation.mutate(completedIds)
     }
   }
 
@@ -53,12 +58,13 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask }: Props
     onLogout()
   }
 
-  const actionableTasks = tasks?.filter(t =>
+  const visibleTasks = tasks?.filter(t =>
     t.queue === 'todo' &&
-    !t.completedAt &&
     !isBlockedByOpenTask(t) &&
     !isSnoozed(t)
   ) ?? []
+
+  const completedTasks = tasks?.filter(t => t.completedAt !== null) ?? []
 
   return (
     <div className="flex-1 flex flex-col">
@@ -77,11 +83,10 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask }: Props
       {!isLoading && !error && (
         <div className="flex-1 overflow-y-auto">
           <ul>
-            {actionableTasks.map(task => (
+            {visibleTasks.map(task => (
               <TaskRow
                 key={task.id}
                 task={task}
-                completed={justCompleted.has(task.id)}
                 onCheck={() => handleCheckbox(task)}
                 onClick={() => onTaskClick(task.id)}
               />
@@ -98,6 +103,13 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask }: Props
           <div className="border-t border-gray-200 mt-4">
             <p className="text-center text-xs text-gray-400 uppercase tracking-wider py-3">Settings</p>
             <button
+              onClick={handleArchiveCompleted}
+              disabled={archiveMutation.isPending || completedTasks.length === 0}
+              className="w-full py-3 text-center text-gray-500 hover:text-gray-700 disabled:text-gray-300"
+            >
+              {archiveMutation.isPending ? 'Archiving...' : 'Archive completed tasks'}
+            </button>
+            <button
               onClick={handleLogout}
               className="w-full py-3 text-center text-gray-500 hover:text-gray-700"
             >
@@ -110,12 +122,12 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask }: Props
   )
 }
 
-function TaskRow({ task, completed, onCheck, onClick }: {
+function TaskRow({ task, onCheck, onClick }: {
   task: TaskResponse
-  completed: boolean
   onCheck: () => void
   onClick: () => void
 }) {
+  const completed = task.completedAt !== null
   const displayTitle = task.title || '(unnamed)'
 
   return (

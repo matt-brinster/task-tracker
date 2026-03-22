@@ -25,23 +25,21 @@ function ExistingTaskDetail({ taskId, onBack }: { taskId: string; onBack: () => 
   const completeMutation = useMutation({
     mutationFn: completeTask,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', taskId] })
-      queryClient.invalidateQueries({ queryKey: ['tasks', 'open'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
     },
   })
 
   const reopenMutation = useMutation({
     mutationFn: reopenTask,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', taskId] })
-      queryClient.invalidateQueries({ queryKey: ['tasks', 'open'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
     },
   })
 
   const deleteMutation = useMutation({
     mutationFn: deleteTask,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', 'open'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
       onBack()
     },
   })
@@ -128,7 +126,7 @@ function NewTaskDetail({ onBack }: { onBack: () => void }) {
   const createMutation = useMutation({
     mutationFn: () => createTask(title.trim(), details),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', 'open'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
       onBack()
     },
   })

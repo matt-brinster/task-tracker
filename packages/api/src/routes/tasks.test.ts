@@ -4,7 +4,7 @@ import app from './app.js'
 import { client, db } from '../repository/client.js'
 import { ensureIndexes } from '../repository/indexes.js'
 import { createTask } from '../domain/task.js'
-import { completeTask, deleteTask, snoozeTask, addBlockers } from '../domain/task_operations.js'
+import { completeTask, deleteTask, snoozeTask, addBlockers, archiveTask } from '../domain/task_operations.js'
 import { insertTask, updateTask, softDeleteTask } from '../repository/task_repository.js'
 import { createTestSession } from './test-helpers.js'
 
@@ -82,6 +82,154 @@ describe('GET /tasks/open', () => {
 
     expect(res.body).toHaveLength(1)
     expect(res.body[0].title).toBe('My task')
+  })
+})
+
+describe('GET /tasks/active', () => {
+  it('returns an empty array when the user has no tasks', async () => {
+    const res = await request(app)
+      .get('/tasks/active')
+      .set(...auth(token1))
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual([])
+  })
+
+  it('returns open tasks', async () => {
+    await insertTask(createTask('user-1', 'Buy milk'))
+
+    const res = await request(app)
+      .get('/tasks/active')
+      .set(...auth(token1))
+
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].title).toBe('Buy milk')
+  })
+
+  it('returns completed tasks (not yet archived)', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    const completed = completeTask(task, new Date())
+    await insertTask(completed)
+
+    const res = await request(app)
+      .get('/tasks/active')
+      .set(...auth(token1))
+
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].completedAt).not.toBeNull()
+  })
+
+  it('does not return archived tasks', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    const completed = completeTask(task, new Date())
+    const archived = archiveTask(completed, new Date())
+    await insertTask(archived)
+
+    const res = await request(app)
+      .get('/tasks/active')
+      .set(...auth(token1))
+
+    expect(res.body).toEqual([])
+  })
+
+  it('does not return deleted tasks', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    const deleted = deleteTask(task, new Date())
+    await insertTask(deleted)
+
+    const res = await request(app)
+      .get('/tasks/active')
+      .set(...auth(token1))
+
+    expect(res.body).toEqual([])
+  })
+
+  it('does not return tasks belonging to other users', async () => {
+    await insertTask(createTask('user-1', 'My task'))
+    await insertTask(createTask('user-2', 'Their task'))
+
+    const res = await request(app)
+      .get('/tasks/active')
+      .set(...auth(token1))
+
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].title).toBe('My task')
+  })
+})
+
+describe('POST /tasks/archive', () => {
+  it('archives the specified tasks and returns the count', async () => {
+    const t1 = createTask('user-1', 'Task 1')
+    const t2 = createTask('user-1', 'Task 2')
+    const c1 = completeTask(t1, new Date())
+    const c2 = completeTask(t2, new Date())
+    await insertTask(c1)
+    await insertTask(c2)
+
+    const res = await request(app)
+      .post('/tasks/archive')
+      .set(...auth(token1))
+      .send({ taskIds: [c1.id, c2.id] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.archivedCount).toBe(2)
+  })
+
+  it('archived tasks no longer appear in GET /tasks/active', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    const completed = completeTask(task, new Date())
+    await insertTask(completed)
+
+    await request(app)
+      .post('/tasks/archive')
+      .set(...auth(token1))
+      .send({ taskIds: [task.id] })
+
+    const res = await request(app)
+      .get('/tasks/active')
+      .set(...auth(token1))
+
+    expect(res.body).toEqual([])
+  })
+
+  it('does not archive tasks belonging to other users', async () => {
+    const task = createTask('user-2', 'Their task')
+    await insertTask(task)
+
+    const res = await request(app)
+      .post('/tasks/archive')
+      .set(...auth(token1))
+      .send({ taskIds: [task.id] })
+
+    expect(res.body.archivedCount).toBe(0)
+  })
+
+  it('ignores IDs that do not exist', async () => {
+    const res = await request(app)
+      .post('/tasks/archive')
+      .set(...auth(token1))
+      .send({ taskIds: ['nonexistent-id'] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.archivedCount).toBe(0)
+  })
+
+  it('returns 400 when taskIds is missing', async () => {
+    const res = await request(app)
+      .post('/tasks/archive')
+      .set(...auth(token1))
+      .send({})
+
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when taskIds is empty', async () => {
+    const res = await request(app)
+      .post('/tasks/archive')
+      .set(...auth(token1))
+      .send({ taskIds: [] })
+
+    expect(res.status).toBe(400)
   })
 })
 

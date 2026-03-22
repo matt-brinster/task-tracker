@@ -10,6 +10,7 @@
 ## Behavior
 - [ ] Autosave with debounce when typing title/details
 - [ ] Delete button on new tasks (create then immediately delete)
+- [ ] Handle invalid/expired token gracefully (currently 401 triggers reload loop if localStorage has a bad token)
 - [ ] ~~Keep completed tasks visible until session ends~~ → replaced by archive feature (see below)
 
 ## Archive Feature
@@ -19,88 +20,38 @@ This eliminates the cache invalidation problem: completing a task no longer remo
 from the query, so there's no shadow state to maintain. Unarchive is a future concern
 (reachable via full-text search).
 
-### 1. Domain (`packages/api/`)
+### 1. Domain (`packages/api/`) — done
 
-- [ ] **Add `archivedAt: Date | null` to `Task` type** (`src/domain/task.ts`)
-  - Initialize to `null` in `createTask()`
+- [x] **Add `archivedAt: Date | null` to `Task` type** (`src/domain/task.ts`)
+- [x] **Add `archiveTask` operation** (`src/domain/task_operations.ts`)
+- [x] **Tests** (`src/domain/task_operations.test.ts`) — 39 tests, all existing "preserves all other fields" tests updated for `archivedAt`
 
-- [ ] **Add `archiveTask` operation** (`src/domain/task_operations.ts`)
-  - `archiveTask(task: Task, at: Date): Task` — sets `archivedAt`
-  - No `unarchiveTask` for now
+### 2. Repository (`packages/api/`) — done
 
-- [ ] **Tests** (`src/domain/task_operations.test.ts`)
-  - `archiveTask` sets `archivedAt`, leaves other fields untouched
-
-### 2. Repository (`packages/api/`)
-
-- [ ] **Add `archivedAt` to `TaskDocument`** (`src/repository/task_repository.ts`)
-  - Update `toDocument()` and `fromDocument()` mapping
-
-- [ ] **Rename `findOpenTasks` → `findActiveTasks`** (`src/repository/task_repository.ts`)
-  - New filter: `{ userId, deletedAt: null, archivedAt: null }` (drop `completedAt: null`)
-  - This is the key change: completed-but-unarchived tasks now appear in results
-
-- [ ] **Add `archiveTasks(userId: string, taskIds: string[], at: Date)`** (`src/repository/task_repository.ts`)
-  - Bulk update: set `archivedAt` on all docs matching `{ _id: { $in: taskIds }, userId, deletedAt: null, archivedAt: null }`
-  - No server-side check for `completedAt` — caller decides which tasks to archive
-  - Return count of archived tasks
-
-- **`searchTasks` — no changes now.** Current filter (`deletedAt: null, completedAt: null`) stays.
-  Future search work has two distinct use cases:
-  - **Unarchive/revive:** find archived tasks to bring back into the active list
+- [x] **Add `archivedAt` to `TaskDocument`** — `toDocument`/`fromDocument` updated, `fromDocument` uses `?? null` for backward compat
+- [x] **Add `findActiveTasks`** — `{ userId, deletedAt: null, archivedAt: null }`, keeps `findOpenTasks` for now
+- [x] **Add `archiveTasks(userId, taskIds, at)`** — bulk `$set` by ID array
+- [x] **Add `archivedAt` compound index** — old `completedAt` index retained (cleanup deferred)
+- **`searchTasks` — no changes now.** Future search has two use cases:
+  - **Unarchive/revive:** find archived tasks to bring back
   - **Blocker lookup:** find tasks (including completed/archived) to add as blockers
 
-- [ ] **Update compound index** (`src/repository/indexes.ts`)
-  - Change `{ userId: 1, deletedAt: 1, completedAt: 1 }` → `{ userId: 1, deletedAt: 1, archivedAt: 1 }`
-  - `completedAt` no longer drives query filtering, `archivedAt` does
+### 3. API routes (`packages/api/`) — done
 
-### 3. API routes (`packages/api/`)
+- [x] **`GET /tasks/active`** — returns unarchived, non-deleted tasks (completed or not)
+- [x] **`POST /tasks/archive`** — accepts `{ taskIds: string[] }`, returns `{ archivedCount }`
+- [x] **`archivedAt` added to `toTaskResponse`**
+- [x] **Route tests** — 12 new tests for active + archive endpoints (199 total API tests)
+- `GET /tasks/open` retained for now (cleanup deferred)
 
-- [ ] **Add `GET /tasks/active`** (`src/routes/tasks.ts`)
-  - Calls `findActiveTasks` — returns unarchived, non-deleted tasks (completed or not)
-- [ ] **Delete `GET /tasks/open`** (`src/routes/tasks.ts`)
-  - Remove after frontend is switched over to `/tasks/active`
+### 4. Frontend (`packages/web/`) — done
 
-- [ ] **Add `POST /tasks/archive`** (`src/routes/tasks.ts`)
-  - Accepts `{ taskIds: string[] }`
-  - Calls `archiveTasks(req.userId, taskIds, new Date())`
-  - Returns `{ archivedCount: number }`
-
-- [ ] **Add `archivedAt` to `toTaskResponse`** (`src/routes/tasks.ts`)
-  - Not strictly needed now (archived tasks aren't returned), but keeps the API honest
-
-- [ ] **Update route tests** (`src/routes/tasks.test.ts`)
-  - Rename open-tasks tests to active-tasks
-  - Test that completed tasks appear in active list
-  - Test archive-completed endpoint (archives only completed, returns count)
-  - Test that archived tasks no longer appear in active list or search
-
-### 4. Frontend (`packages/web/`)
-
-- [ ] **Update API functions** (`src/api.ts`)
-  - Rename `fetchOpenTasks` → `fetchActiveTasks`, point at `/tasks/active`
-  - Add `archiveTasks(taskIds: string[]): Promise<{ archivedCount: number }>`
-
-- [ ] **Update `TaskResponse` type** (`src/types.ts`)
-  - Add `archivedAt: string | null`
-
-- [ ] **Rewrite `TaskListPage`** (`src/pages/TaskListPage.tsx`)
-  - Drop `justCompleted` state entirely
-  - Query key changes from `['tasks', 'open']` to `['tasks', 'active']`
-  - Determine completed status from `task.completedAt !== null` (server truth)
-  - Checkbox calls `completeTask`/`reopenTask` as before, but no shadow set needed
-  - Split list rendering: actionable tasks on top, completed tasks below (with strikethrough or muted style)
-
-- [ ] **Add "Archive completed" button** (`src/pages/TaskListPage.tsx`)
-  - Place in the Settings section for now (near logout)
-  - Only visible when completed tasks exist in the list
-  - Collects IDs of completed tasks from the current list, calls `archiveTasks(ids)`
-  - Invalidates `['tasks', 'active']` query on success
-
-- [ ] **Update tests** (`src/pages/TaskListPage.test.tsx`, `src/api.test.ts`)
-  - Test completed tasks render in the list with checked state
-  - Test archive button appears/disappears based on completed tasks
-  - Test archive mutation invalidates the task list query
+- [x] **`fetchActiveTasks` + `archiveTasks`** added to `api.ts`
+- [x] **`archivedAt` added to `TaskResponse`** in `types.ts`
+- [x] **`TaskListPage` rewritten** — uses `fetchActiveTasks`, no `justCompleted` shadow state, completion derived from `task.completedAt`, completed tasks stay in place (no separate section)
+- [x] **"Archive completed tasks" button** in settings section, always visible, disabled when nothing to archive
+- [x] **`TaskDetailPage`** — invalidation updated from `['tasks', 'open']` to `['tasks']` prefix
+- [x] **Tests updated** — all 45 web tests passing
 
 ## Cleanup — remove pre-archive "open tasks" paths (revisit after blocker work is done)
 

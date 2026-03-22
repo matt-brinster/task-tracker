@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --env-file=.env.test ../../node_modules/.bin/vitest",
+    "dev": "tsx --watch --env-file=.env src/index.ts",
     "clean": "rm -rf dist",
     "build": "rm -rf dist && tsc"
   },

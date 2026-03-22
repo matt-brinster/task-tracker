@@ -12,5 +12,6 @@ export type TaskResponse = {
   queue: Queue
   completedAt: string | null
   snoozedUntil: string | null
+  archivedAt: string | null
   blockers: Blocker[]
 }
