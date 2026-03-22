@@ -1,4 +1,5 @@
 import { getToken, clearToken } from './auth.ts'
+import type { TaskResponse } from './types.ts'
 
 export class ApiError extends Error {
   status: number
@@ -35,6 +36,46 @@ export async function fetchApi(path: string, options: RequestInit = {}): Promise
   }
 
   return response
+}
+
+export async function fetchOpenTasks(): Promise<TaskResponse[]> {
+  const response = await fetchApi('/tasks/open')
+  return response.json() as Promise<TaskResponse[]>
+}
+
+export async function createTask(title: string, details: string = ''): Promise<TaskResponse> {
+  const response = await fetchApi('/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ title, details }),
+  })
+  if (!response.ok) {
+    const body = await response.json() as { error: string }
+    throw new ApiError(response.status, body.error)
+  }
+  return response.json() as Promise<TaskResponse>
+}
+
+export async function fetchTask(id: string): Promise<TaskResponse> {
+  const response = await fetchApi(`/tasks/${id}`)
+  if (!response.ok) {
+    const body = await response.json() as { error: string }
+    throw new ApiError(response.status, body.error)
+  }
+  return response.json() as Promise<TaskResponse>
+}
+
+export async function completeTask(id: string): Promise<TaskResponse> {
+  const response = await fetchApi(`/tasks/${id}/complete`, { method: 'POST' })
+  return response.json() as Promise<TaskResponse>
+}
+
+export async function reopenTask(id: string): Promise<TaskResponse> {
+  const response = await fetchApi(`/tasks/${id}/reopen`, { method: 'POST' })
+  return response.json() as Promise<TaskResponse>
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  await fetchApi(`/tasks/${id}`, { method: 'DELETE' })
 }
 
 export async function redeemInvitation(key: string): Promise<string> {

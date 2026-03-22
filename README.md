@@ -30,16 +30,16 @@ npm run build -w api
 node packages/api/dist/index.js
 ```
 
+Or run the API and MongoDB in Docker:
+
+```bash
+docker compose up --build
+```
+
 Start the frontend dev server (port 5173, proxies `/api` to the backend):
 
 ```bash
 npm run dev -w web
-```
-
-Or run the full stack in Docker:
-
-```bash
-docker compose up --build
 ```
 
 ## Testing

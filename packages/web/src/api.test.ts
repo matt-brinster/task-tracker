@@ -1,6 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { fetchApi, redeemInvitation, ApiError } from './api.ts'
+import {
+  fetchApi, redeemInvitation, ApiError,
+  fetchOpenTasks, createTask, fetchTask, completeTask, reopenTask, deleteTask,
+} from './api.ts'
 import { setToken, getToken } from './auth.ts'
+
+const sampleTask = {
+  id: 'task-1',
+  title: 'Buy milk',
+  details: '',
+  queue: 'todo',
+  completedAt: null,
+  snoozedUntil: null,
+  blockers: [],
+}
 
 describe('fetchApi', () => {
   beforeEach(() => {
@@ -64,6 +77,175 @@ describe('fetchApi', () => {
     await expect(fetchApi('/tasks')).rejects.toThrow('Unauthorized')
     expect(getToken()).toBeNull()
     expect(reloadMock).toHaveBeenCalled()
+  })
+})
+
+describe('fetchOpenTasks', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls GET /tasks/open and returns the task list', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([sampleTask]), { status: 200 })
+    )
+
+    const tasks = await fetchOpenTasks()
+
+    expect(tasks).toEqual([sampleTask])
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/open')
+    expect(options!.method).toBeUndefined()
+  })
+})
+
+describe('createTask', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls POST /tasks with title and details', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(sampleTask), { status: 201 })
+    )
+
+    const task = await createTask('Buy milk', 'From the store')
+
+    expect(task).toEqual(sampleTask)
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks')
+    expect(options!.method).toBe('POST')
+    expect(JSON.parse(options!.body as string)).toEqual({ title: 'Buy milk', details: 'From the store' })
+  })
+
+  it('defaults details to empty string', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(sampleTask), { status: 201 })
+    )
+
+    await createTask('Buy milk')
+
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(JSON.parse(options!.body as string)).toEqual({ title: 'Buy milk', details: '' })
+  })
+
+  it('throws ApiError on non-ok response', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ error: 'title is required' }), { status: 400 })
+    )
+
+    try {
+      await createTask('')
+      expect.fail('should have thrown')
+    } catch (err) {
+      expect(err).toBeInstanceOf(ApiError)
+      expect((err as ApiError).status).toBe(400)
+      expect((err as ApiError).message).toBe('title is required')
+    }
+  })
+})
+
+describe('fetchTask', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls GET /tasks/:id and returns the task', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(sampleTask), { status: 200 })
+    )
+
+    const task = await fetchTask('task-1')
+
+    expect(task).toEqual(sampleTask)
+    const [url] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/task-1')
+  })
+
+  it('throws ApiError on 404', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Task not found' }), { status: 404 })
+    )
+
+    try {
+      await fetchTask('nonexistent')
+      expect.fail('should have thrown')
+    } catch (err) {
+      expect(err).toBeInstanceOf(ApiError)
+      expect((err as ApiError).status).toBe(404)
+    }
+  })
+})
+
+describe('completeTask', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls POST /tasks/:id/complete and returns updated task', async () => {
+    setToken('test-token')
+    const completed = { ...sampleTask, completedAt: '2026-03-20T00:00:00.000Z' }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(completed), { status: 200 })
+    )
+
+    const task = await completeTask('task-1')
+
+    expect(task.completedAt).toBe('2026-03-20T00:00:00.000Z')
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/task-1/complete')
+    expect(options!.method).toBe('POST')
+  })
+})
+
+describe('reopenTask', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls POST /tasks/:id/reopen and returns updated task', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(sampleTask), { status: 200 })
+    )
+
+    const task = await reopenTask('task-1')
+
+    expect(task.completedAt).toBeNull()
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/task-1/reopen')
+    expect(options!.method).toBe('POST')
+  })
+})
+
+describe('deleteTask', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls DELETE /tasks/:id', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(null, { status: 204 })
+    )
+
+    await deleteTask('task-1')
+
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/task-1')
+    expect(options!.method).toBe('DELETE')
   })
 })
 
