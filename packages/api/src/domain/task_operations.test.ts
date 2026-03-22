@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createTask } from './task.js'
-import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, addBlockers, removeBlockers, setQueue } from './task_operations.js'
+import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, addBlockers, removeBlockers, setQueue, archiveTask } from './task_operations.js'
 
 const blocker1 = { id: 'id-1', title: 'Blocker 1' }
 const blocker2 = { id: 'id-2', title: 'Blocker 2' }
@@ -29,6 +29,7 @@ describe('completeTask', () => {
     expect(result.details).toBe(task.details)
     expect(result.queue).toBe(task.queue)
     expect(result.snoozedUntil).toBe(task.snoozedUntil)
+    expect(result.archivedAt).toBe(task.archivedAt)
     expect(result.blockers).toEqual(task.blockers)
   })
 
@@ -63,6 +64,7 @@ describe('reopenTask', () => {
     expect(result.details).toBe(task.details)
     expect(result.queue).toBe(task.queue)
     expect(result.snoozedUntil).toBe(task.snoozedUntil)
+    expect(result.archivedAt).toBe(task.archivedAt)
     expect(result.blockers).toEqual(task.blockers)
   })
 
@@ -95,6 +97,7 @@ describe('snoozeTask', () => {
     expect(result.details).toBe(task.details)
     expect(result.queue).toBe(task.queue)
     expect(result.completedAt).toBe(task.completedAt)
+    expect(result.archivedAt).toBe(task.archivedAt)
     expect(result.blockers).toEqual(task.blockers)
   })
 
@@ -156,6 +159,7 @@ describe('deleteTask', () => {
     expect(result.queue).toBe(task.queue)
     expect(result.completedAt).toBe(task.completedAt)
     expect(result.snoozedUntil).toBe(task.snoozedUntil)
+    expect(result.archivedAt).toBe(task.archivedAt)
     expect(result.blockers).toEqual(task.blockers)
   })
 })
@@ -200,6 +204,7 @@ describe('addBlockers', () => {
     expect(result.queue).toBe(task.queue)
     expect(result.completedAt).toBe(task.completedAt)
     expect(result.snoozedUntil).toBe(task.snoozedUntil)
+    expect(result.archivedAt).toBe(task.archivedAt)
   })
 })
 
@@ -243,6 +248,7 @@ describe('removeBlockers', () => {
     expect(result.queue).toBe(task.queue)
     expect(result.completedAt).toBe(task.completedAt)
     expect(result.snoozedUntil).toBe(task.snoozedUntil)
+    expect(result.archivedAt).toBe(task.archivedAt)
   })
 })
 
@@ -278,6 +284,35 @@ describe('setQueue', () => {
     expect(result.id).toBe(task.id)
     expect(result.title).toBe(task.title)
     expect(result.details).toBe(task.details)
+    expect(result.completedAt).toBe(task.completedAt)
+    expect(result.snoozedUntil).toBe(task.snoozedUntil)
+    expect(result.archivedAt).toBe(task.archivedAt)
+    expect(result.blockers).toEqual(task.blockers)
+  })
+})
+
+describe('archiveTask', () => {
+  it('sets archivedAt to the provided date', () => {
+    const task = createTask('user-1', 'Buy milk')
+    const now = new Date('2026-03-10T12:00:00Z')
+    const result = archiveTask(task, now)
+    expect(result.archivedAt).toEqual(now)
+  })
+
+  it('does not mutate the original task', () => {
+    const task = createTask('user-1', 'Buy milk')
+    archiveTask(task, new Date())
+    expect(task.archivedAt).toBeNull()
+  })
+
+  it('preserves all other fields', () => {
+    const task = createTask('user-1', 'Buy milk', 'from the shop', 'backlog', [blocker1])
+    const now = new Date('2026-03-10T12:00:00Z')
+    const result = archiveTask(task, now)
+    expect(result.id).toBe(task.id)
+    expect(result.title).toBe(task.title)
+    expect(result.details).toBe(task.details)
+    expect(result.queue).toBe(task.queue)
     expect(result.completedAt).toBe(task.completedAt)
     expect(result.snoozedUntil).toBe(task.snoozedUntil)
     expect(result.blockers).toEqual(task.blockers)

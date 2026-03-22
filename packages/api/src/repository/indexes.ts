@@ -9,6 +9,11 @@ export async function ensureIndexes(): Promise<void> {
     { name: 'tasks_userId_deletedAt_completedAt' }
   )
 
+  await tasks.createIndex(
+    { userId: 1, deletedAt: 1, archivedAt: 1 },
+    { name: 'tasks_userId_deletedAt_archivedAt' }
+  )
+
   await users.createIndex(
     { email: 1 },
     { name: 'users_email', unique: true }

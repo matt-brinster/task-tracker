@@ -35,3 +35,7 @@ export function removeBlockers(task: Task, blockerIds: Set<string>): Task {
 export function setQueue(task: Task, queue: Queue): Task {
   return { ...task, queue }
 }
+
+export function archiveTask(task: Task, at: Date): Task {
+  return { ...task, archivedAt: at }
+}

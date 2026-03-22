@@ -14,6 +14,7 @@ export type TaskDocument = {
   completedAt: Date | null
   snoozedUntil: Date | null
   deletedAt: Date | null
+  archivedAt: Date | null
   blockers: Blocker[]
 }
 
@@ -27,6 +28,7 @@ function toDocument(task: Task): TaskDocument {
     completedAt: task.completedAt,
     snoozedUntil: task.snoozedUntil,
     deletedAt: task.deletedAt,
+    archivedAt: task.archivedAt,
     blockers: [...task.blockers],
   }
 }
@@ -42,6 +44,7 @@ export function fromDocument(doc: TaskDocument): Task {
     completedAt: doc.completedAt,
     snoozedUntil: doc.snoozedUntil,
     deletedAt: doc.deletedAt,
+    archivedAt: doc.archivedAt ?? null,
     blockers: [...doc.blockers],
   }
 }
@@ -79,6 +82,22 @@ export async function findOpenTasks(userId: string, limit = 1000): Promise<Task[
     .limit(limit)
     .toArray()
   return docs.map(fromDocument)
+}
+
+export async function findActiveTasks(userId: string, limit = 1000): Promise<Task[]> {
+  const docs = await collection()
+    .find({ userId, deletedAt: null, archivedAt: null })
+    .limit(limit)
+    .toArray()
+  return docs.map(fromDocument)
+}
+
+export async function archiveTasks(userId: string, taskIds: string[], at: Date): Promise<number> {
+  const result = await collection().updateMany(
+    { _id: { $in: taskIds }, userId, deletedAt: null, archivedAt: null },
+    { $set: { archivedAt: at } },
+  )
+  return result.modifiedCount
 }
 
 export async function removeBlockerFromAll(userId: string, blockerId: string): Promise<void> {

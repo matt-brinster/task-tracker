@@ -16,6 +16,7 @@ export type Task = {
   completedAt: Date | null
   snoozedUntil: Date | null
   deletedAt: Date | null
+  archivedAt: Date | null
   blockers: Blocker[]
 }
 
@@ -29,6 +30,7 @@ export function createTask(userId: string, title: string, details: string = "", 
     completedAt: null,
     snoozedUntil,
     deletedAt: null,
+    archivedAt: null,
     blockers: [...blockers],
   }
 }
