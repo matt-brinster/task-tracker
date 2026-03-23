@@ -92,8 +92,8 @@ Phase 6a (frontend scaffolding):
 
 Phase 6b (auth):
 - `packages/web/src/auth.ts` — `getToken()`, `setToken()`, `clearToken()` wrapping `localStorage`
-- `packages/web/src/api.ts` — `fetchApi(path, options)` attaches `Bearer` header; clears token and reloads on 401. `redeemInvitation(key)` calls `POST /auth/redeem`. `fetchActiveTasks()`, `archiveTasks(taskIds)`, `updateTask(id, { title?, details? })`, plus CRUD task functions.
-- `packages/web/src/App.tsx` — conditional rendering based on auth state (no routing — everything at `/`). `RequireAuth` wrapper checks for token.
+- `packages/web/src/api.ts` — `fetchApi(path, options)` attaches `Bearer` header; on 401, clears token and dispatches `auth:logout` custom event (no page reload). `redeemInvitation(key)` calls `POST /auth/redeem`. `fetchActiveTasks()`, `archiveTasks(taskIds)`, `updateTask(id, { title?, details? })`, plus CRUD task functions.
+- `packages/web/src/App.tsx` — conditional rendering based on auth state (no routing — everything at `/`). Listens for `auth:logout` event to handle expired/invalid tokens gracefully.
 - `packages/web/src/pages/LoginPage.tsx` — invitation key form, calls `redeemInvitation`, stores token on success
 - `packages/web/src/components/Checkbox.tsx` — shared task checkbox (checked/unchecked with checkmark SVG), derives aria-label from `displayTitle` and `checked`, supports optional `disabled` prop
 - `packages/web/src/components/SectionDivider.tsx` — centered label with horizontal lines on each side

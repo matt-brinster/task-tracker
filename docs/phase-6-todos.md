@@ -10,7 +10,7 @@
 ## Behavior
 - [x] Autosave with debounce when typing title/details
 - [x] Delete button on new tasks (create then immediately delete)
-- [ ] Handle invalid/expired token gracefully (currently 401 triggers reload loop if localStorage has a bad token)
+- [x] Handle invalid/expired token gracefully (currently 401 triggers reload loop if localStorage has a bad token)
 - [ ] ~~Keep completed tasks visible until session ends~~ → replaced by archive feature (see below)
 
 ## Archive Feature

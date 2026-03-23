@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { getToken } from './auth.ts'
 import LoginPage from './pages/LoginPage.tsx'
 import TaskListPage from './pages/TaskListPage.tsx'
@@ -11,6 +11,12 @@ type View =
 function App() {
   const [loggedIn, setLoggedIn] = useState(() => getToken() !== null)
   const [view, setView] = useState<View>({ page: 'list' })
+
+  useEffect(() => {
+    const handleLogout = () => setLoggedIn(false)
+    window.addEventListener('auth:logout', handleLogout)
+    return () => window.removeEventListener('auth:logout', handleLogout)
+  }, [])
 
   if (!loggedIn) {
     return (

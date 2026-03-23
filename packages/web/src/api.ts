@@ -26,12 +26,8 @@ export async function fetchApi(path: string, options: RequestInit = {}): Promise
   })
 
   if (response.status === 401) {
-    // A 401 means our session token is no longer valid (revoked, expired, etc.).
-    // Clear the dead token and force a full page reload. Since there's no token
-    // in localStorage after clearing, React will render the login screen.
-    // This is simpler than threading auth state back into React from the API layer.
     clearToken()
-    window.location.reload()
+    window.dispatchEvent(new Event('auth:logout'))
     throw new ApiError(401, 'Unauthorized')
   }
 

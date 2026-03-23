@@ -62,21 +62,19 @@ describe('fetchApi', () => {
     expect(headers.has('Authorization')).toBe(false)
   })
 
-  it('clears token and reloads on 401', async () => {
+  it('clears token and dispatches auth:logout on 401', async () => {
     setToken('bad-token')
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({}), { status: 401 })
     )
-    // location.reload throws in jsdom, so mock it
-    const reloadMock = vi.fn()
-    Object.defineProperty(window, 'location', {
-      value: { ...window.location, reload: reloadMock },
-      writable: true,
-    })
+    const logoutHandler = vi.fn()
+    window.addEventListener('auth:logout', logoutHandler)
 
     await expect(fetchApi('/tasks')).rejects.toThrow('Unauthorized')
     expect(getToken()).toBeNull()
-    expect(reloadMock).toHaveBeenCalled()
+    expect(logoutHandler).toHaveBeenCalledTimes(1)
+
+    window.removeEventListener('auth:logout', logoutHandler)
   })
 })
 
