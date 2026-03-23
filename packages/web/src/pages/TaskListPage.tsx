@@ -2,6 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchActiveTasks, completeTask, reopenTask, archiveTasks } from '../api.ts'
 import type { TaskResponse } from '../types.ts'
 import { clearToken } from '../auth.ts'
+import Checkbox from '../components/Checkbox.tsx'
+import SectionDivider from '../components/SectionDivider.tsx'
+import Loading from '../components/Loading.tsx'
+import ErrorMessage from '../components/ErrorMessage.tsx'
 
 type Props = {
   onLogout: () => void
@@ -68,17 +72,9 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask }: Props
 
   return (
     <div className="flex-1 flex flex-col">
-      {isLoading && (
-        <div className="flex-1 flex items-center justify-center text-gray-400">
-          <p>Loading...</p>
-        </div>
-      )}
+      {isLoading && <Loading />}
 
-      {error && (
-        <div className="flex-1 flex items-center justify-center text-red-500 px-4">
-          <p>Failed to load tasks.</p>
-        </div>
-      )}
+      {error && <ErrorMessage message="Failed to load tasks." />}
 
       {!isLoading && !error && (
         <div className="flex-1 overflow-y-auto">
@@ -100,8 +96,8 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask }: Props
             + Task
           </button>
 
-          <div className="border-t border-gray-200 mt-4">
-            <p className="text-center text-xs text-gray-400 uppercase tracking-wider py-3">Settings</p>
+          <div className="mt-4">
+            <SectionDivider label="Settings" />
             <button
               onClick={handleArchiveCompleted}
               disabled={archiveMutation.isPending || completedTasks.length === 0}
@@ -132,22 +128,13 @@ function TaskRow({ task, onCheck, onClick }: {
 
   return (
     <li className="flex items-center border-b border-gray-100">
-      <button
-        onClick={onCheck}
-        className="px-4 py-3 flex-shrink-0"
-        aria-label={completed ? `Reopen "${displayTitle}"` : `Complete "${displayTitle}"`}
-      >
-        <span className={`inline-block w-5 h-5 border-2 rounded ${
-          completed ? 'bg-green-500 border-green-500' : 'border-gray-300'
-        }`}>
-          {completed && (
-            <svg className="w-full h-full text-white" viewBox="0 0 20 20" fill="currentColor">
-              {/* TODO: shop for icon */}
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-          )}
-        </span>
-      </button>
+      <div className="px-4 py-3 shrink-0">
+        <Checkbox
+          checked={completed}
+          onClick={onCheck}
+          displayTitle={displayTitle}
+        />
+      </div>
       <button
         onClick={onClick}
         className="flex-1 text-left py-3 pr-4 min-w-0"

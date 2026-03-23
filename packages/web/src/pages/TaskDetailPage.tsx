@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchTask, completeTask, reopenTask, deleteTask, createTask } from '../api.ts'
+import Checkbox from '../components/Checkbox.tsx'
+import Loading from '../components/Loading.tsx'
+import ErrorMessage from '../components/ErrorMessage.tsx'
 
 type Props = {
   taskId: string | null  // null = new task
@@ -60,9 +63,7 @@ function ExistingTaskDetail({ taskId, onBack }: { taskId: string; onBack: () => 
   if (isLoading) {
     return (
       <DetailShell onBack={onBack}>
-        <div className="flex-1 flex items-center justify-center text-gray-400">
-          <p>Loading...</p>
-        </div>
+        <Loading />
       </DetailShell>
     )
   }
@@ -70,9 +71,7 @@ function ExistingTaskDetail({ taskId, onBack }: { taskId: string; onBack: () => 
   if (error || !task) {
     return (
       <DetailShell onBack={onBack}>
-        <div className="flex-1 flex items-center justify-center text-red-500 px-4">
-          <p>Failed to load task.</p>
-        </div>
+        <ErrorMessage message="Failed to load task." />
       </DetailShell>
     )
   }
@@ -84,21 +83,11 @@ function ExistingTaskDetail({ taskId, onBack }: { taskId: string; onBack: () => 
     <DetailShell onBack={onBack} onDelete={handleDelete}>
       <div className="px-4 py-3 border-b border-gray-200">
         <div className="flex items-center gap-3">
-          <button
+          <Checkbox
+            checked={isCompleted}
             onClick={handleCheckbox}
-            aria-label={isCompleted ? `Reopen "${displayTitle}"` : `Complete "${displayTitle}"`}
-          >
-            {/* TODO: this is repeated style */}
-            <span className={`inline-block w-5 h-5 border-2 rounded ${
-              isCompleted ? 'bg-green-500 border-green-500' : 'border-gray-300'
-            }`}>
-              {isCompleted && (
-                <svg className="w-full h-full text-white" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              )}
-            </span>
-          </button>
+            displayTitle={displayTitle}
+          />
           <span className={`text-lg text-gray-900`}>
             {displayTitle}
           </span>

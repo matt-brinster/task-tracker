@@ -95,6 +95,10 @@ Phase 6b (auth):
 - `packages/web/src/api.ts` — `fetchApi(path, options)` attaches `Bearer` header; clears token and reloads on 401. `redeemInvitation(key)` calls `POST /auth/redeem`. `fetchActiveTasks()`, `archiveTasks(taskIds)`, plus CRUD task functions.
 - `packages/web/src/App.tsx` — conditional rendering based on auth state (no routing — everything at `/`). `RequireAuth` wrapper checks for token.
 - `packages/web/src/pages/LoginPage.tsx` — invitation key form, calls `redeemInvitation`, stores token on success
+- `packages/web/src/components/Checkbox.tsx` — shared task checkbox (checked/unchecked with checkmark SVG), derives aria-label from `displayTitle` and `checked`
+- `packages/web/src/components/SectionDivider.tsx` — centered label with horizontal lines on each side
+- `packages/web/src/components/Loading.tsx` — centered "Loading..." state
+- `packages/web/src/components/ErrorMessage.tsx` — centered error message with configurable text
 - `packages/web/src/pages/TaskListPage.tsx` — main task list, uses `fetchActiveTasks`. Completed tasks stay in place (no separate section). Checkbox toggles complete/reopen. "Archive completed tasks" button in settings section. No shadow state — completion derived from `task.completedAt`.
 - `packages/web/src/pages/TaskDetailPage.tsx` — task detail/edit view for existing and new tasks.
 - `packages/web/src/auth.test.ts` — tests for token helpers (4 tests)

@@ -2,10 +2,10 @@
 
 ## Styling
 - [ ] Cream/manila background, more colors, fewer borders/line breaks
-- [ ] Restyle section dividers (centered label with lines on each side)
+- [x] Restyle section dividers (centered label with lines on each side)
 
 ## Shared components
-- [ ] Extract shared components: Checkbox, SectionDivider, Loading/Error states
+- [x] Extract shared components: Checkbox, SectionDivider, Loading/Error states
 
 ## Behavior
 - [ ] Autosave with debounce when typing title/details
