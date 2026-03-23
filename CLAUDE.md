@@ -100,7 +100,7 @@ Phase 6b (auth):
 - `packages/web/src/components/Loading.tsx` — centered "Loading..." state
 - `packages/web/src/components/ErrorMessage.tsx` — centered error message with configurable text
 - `packages/web/src/pages/TaskListPage.tsx` — main task list, uses `fetchActiveTasks`. Completed tasks stay in place (no separate section). Checkbox toggles complete/reopen. "Archive completed tasks" button in settings section. No shadow state — completion derived from `task.completedAt`.
-- `packages/web/src/pages/TaskDetailPage.tsx` — task detail/edit view. Unified flow for new and existing tasks: title and details are always editable with debounced autosave (`use-debounce`). New tasks are created on the server when the user first types a non-empty title; subsequent edits are PATCHed. Delete button is always visible (navigates back if task not yet created, otherwise deletes). No explicit "Create" or "Save" button.
+- `packages/web/src/pages/TaskDetailPage.tsx` — task detail/edit view. Unified flow for new and existing tasks: title and details are always editable with debounced autosave (`use-debounce`). Both fields styled with visible borders and blue focus rings. New tasks are created on the server when the user first types a non-empty title; subsequent edits are PATCHed. Delete button is always visible (navigates back if task not yet created, otherwise deletes). No explicit "Create" or "Save" button.
 - `packages/web/src/auth.test.ts` — tests for token helpers (4 tests)
 - `packages/web/src/api.test.ts` — tests for fetchApi, updateTask, and other API functions (6 tests)
 - `packages/web/src/App.test.tsx` — tests for auth guard rendering (4 tests)

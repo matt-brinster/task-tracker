@@ -1,7 +1,7 @@
 # Phase 6c TODOs
 
 ## Styling
-- [ ] Cream/manila background, more colors, fewer borders/line breaks
+- [x] Remove border dividers between task rows in list
 - [x] Restyle section dividers (centered label with lines on each side)
 
 ## Shared components
@@ -61,5 +61,7 @@ from the query, so there's no shadow state to maintain. Unarchive is a future co
 - [ ] Update `searchTasks` filter if/when search use cases are addressed
 
 ## Polish
+- [ ] Cream/manila background, more colors
+- [ ] Fine-tune vertical spacing between task rows
 - [ ] Animations between list and detail screens
 - [ ] Shop for an icon library to replace inline SVGs

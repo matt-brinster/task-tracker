@@ -127,8 +127,8 @@ function TaskRow({ task, onCheck, onClick }: {
   const displayTitle = task.title || '(unnamed)'
 
   return (
-    <li className="flex items-center border-b border-gray-100">
-      <div className="px-4 py-3 shrink-0">
+    <li className="flex items-start">
+      <div className="px-4 pt-2.75 shrink-0">
         <Checkbox
           checked={completed}
           onClick={onCheck}
@@ -137,7 +137,7 @@ function TaskRow({ task, onCheck, onClick }: {
       </div>
       <button
         onClick={onClick}
-        className="flex-1 text-left py-3 pr-4 min-w-0"
+        className="flex-1 text-left py-2 pr-4 min-w-0"
       >
         <span className={`block truncate text-gray-900`}>
           {displayTitle}

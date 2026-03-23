@@ -156,31 +156,33 @@ function TaskForm({ initialTitle, initialDetails, task, onBack }: TaskFormProps)
 
   return (
     <DetailShell onBack={onBack} onDelete={handleDelete}>
-      <div className="px-4 py-3 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <Checkbox
-            checked={isCompleted}
-            onClick={handleCheckbox}
-            displayTitle={displayTitle}
-            disabled={!taskId}
-          />
+      <div className="px-4 py-3">
+        <div className="flex items-start gap-3">
+          <div className="pt-1.75 shrink-0">
+            <Checkbox
+              checked={isCompleted}
+              onClick={handleCheckbox}
+              displayTitle={displayTitle}
+              disabled={!taskId}
+            />
+          </div>
           <input
             type="text"
             value={title}
             onChange={e => { setTitle(e.target.value); titleRef.current = e.target.value; debouncedSave(e.target.value, details, taskId) }}
             placeholder="Task name"
             autoFocus={!task}
-            className="flex-1 text-lg text-gray-900 border-none outline-none placeholder-gray-400 bg-transparent"
+            className="flex-1 text-gray-900 placeholder-gray-400 border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
           />
         </div>
       </div>
 
-      <div className="px-4 py-3">
+      <div className="px-4">
         <textarea
           value={details}
           onChange={e => { setDetails(e.target.value); detailsRef.current = e.target.value; debouncedSave(title, e.target.value, taskId) }}
           placeholder="Details (optional)"
-          className="w-full h-32 border border-gray-200 rounded p-2 text-sm text-gray-700 resize-none"
+          className="w-full h-32 border border-gray-200 rounded px-2 py-1 text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
         />
       </div>
 
