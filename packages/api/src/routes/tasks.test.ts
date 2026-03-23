@@ -500,6 +500,126 @@ describe('DELETE /tasks/:id', () => {
   })
 })
 
+describe('PATCH /tasks/:id', () => {
+  it('updates title only', async () => {
+    const task = createTask('user-1', 'Buy milk', 'whole milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .patch(`/tasks/${task.id}`)
+      .set(...auth(token1))
+      .send({ title: 'Buy oat milk' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.title).toBe('Buy oat milk')
+    expect(res.body.details).toBe('whole milk')
+  })
+
+  it('updates details only', async () => {
+    const task = createTask('user-1', 'Buy milk', 'whole milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .patch(`/tasks/${task.id}`)
+      .set(...auth(token1))
+      .send({ details: '2% milk' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.title).toBe('Buy milk')
+    expect(res.body.details).toBe('2% milk')
+  })
+
+  it('updates both title and details', async () => {
+    const task = createTask('user-1', 'Buy milk', 'whole milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .patch(`/tasks/${task.id}`)
+      .set(...auth(token1))
+      .send({ title: 'Buy oat milk', details: 'from Trader Joe\'s' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.title).toBe('Buy oat milk')
+    expect(res.body.details).toBe('from Trader Joe\'s')
+  })
+
+  it('persists updates to the database', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    await request(app)
+      .patch(`/tasks/${task.id}`)
+      .set(...auth(token1))
+      .send({ title: 'Buy eggs' })
+
+    const getRes = await request(app)
+      .get(`/tasks/${task.id}`)
+      .set(...auth(token1))
+
+    expect(getRes.body.title).toBe('Buy eggs')
+  })
+
+  it('returns 404 for non-existent task', async () => {
+    const res = await request(app)
+      .patch('/tasks/nonexistent')
+      .set(...auth(token1))
+      .send({ title: 'Updated' })
+
+    expect(res.status).toBe(404)
+  })
+
+  it('returns 404 for another user\'s task', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .patch(`/tasks/${task.id}`)
+      .set(...auth(token2))
+      .send({ title: 'Stolen' })
+
+    expect(res.status).toBe(404)
+  })
+
+  it('rejects non-string title', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .patch(`/tasks/${task.id}`)
+      .set(...auth(token1))
+      .send({ title: 123 })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('title must be a string')
+  })
+
+  it('rejects non-string details', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .patch(`/tasks/${task.id}`)
+      .set(...auth(token1))
+      .send({ details: true })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('details must be a string')
+  })
+
+  it('allows setting title to empty string', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .patch(`/tasks/${task.id}`)
+      .set(...auth(token1))
+      .send({ title: '' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.title).toBe('')
+  })
+})
+
 describe('POST /tasks/:id/complete', () => {
   it('completes a task and returns it', async () => {
     const task = createTask('user-1', 'Buy milk')

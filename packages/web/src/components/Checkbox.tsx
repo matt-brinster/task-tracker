@@ -2,14 +2,15 @@ type Props = {
   checked: boolean
   onClick: () => void
   displayTitle: string
+  disabled?: boolean
 }
 
-export default function Checkbox({ checked, onClick, displayTitle }: Props) {
+export default function Checkbox({ checked, onClick, displayTitle, disabled }: Props) {
   const label = checked ? `Reopen "${displayTitle}"` : `Complete "${displayTitle}"`
   return (
-    <button onClick={onClick} aria-label={label}>
+    <button onClick={onClick} aria-label={label} disabled={disabled}>
       <span className={`inline-block w-5 h-5 border-2 rounded ${
-        checked ? 'bg-green-500 border-green-500' : 'border-gray-300'
+        checked ? 'bg-green-500 border-green-500' : disabled ? 'border-gray-200' : 'border-gray-300'
       }`}>
         {checked && (
           <svg className="w-full h-full text-white" viewBox="0 0 20 20" fill="currentColor">

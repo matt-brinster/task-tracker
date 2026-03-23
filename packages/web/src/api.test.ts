@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   fetchApi, redeemInvitation, ApiError,
-  fetchOpenTasks, createTask, fetchTask, completeTask, reopenTask, deleteTask,
+  fetchOpenTasks, createTask, fetchTask, updateTask, completeTask, reopenTask, deleteTask,
 } from './api.ts'
 import { setToken, getToken } from './auth.ts'
 
@@ -226,6 +226,41 @@ describe('reopenTask', () => {
     const [url, options] = vi.mocked(fetch).mock.calls[0]!
     expect(url).toBe('/api/tasks/task-1/reopen')
     expect(options!.method).toBe('POST')
+  })
+})
+
+describe('updateTask', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls PATCH /tasks/:id with fields and returns updated task', async () => {
+    setToken('test-token')
+    const updated = { ...sampleTask, title: 'Buy oat milk' }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(updated), { status: 200 })
+    )
+
+    const task = await updateTask('task-1', { title: 'Buy oat milk' })
+
+    expect(task.title).toBe('Buy oat milk')
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/task-1')
+    expect(options!.method).toBe('PATCH')
+    expect(JSON.parse(options!.body as string)).toEqual({ title: 'Buy oat milk' })
+  })
+
+  it('sends only the fields provided', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ...sampleTask, details: 'updated details' }), { status: 200 })
+    )
+
+    await updateTask('task-1', { details: 'updated details' })
+
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(JSON.parse(options!.body as string)).toEqual({ details: 'updated details' })
   })
 })
 

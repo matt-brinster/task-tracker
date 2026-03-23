@@ -69,6 +69,14 @@ export async function createTask(title: string, details: string = ''): Promise<T
   return response.json() as Promise<TaskResponse>
 }
 
+export async function updateTask(id: string, fields: { title?: string; details?: string }): Promise<TaskResponse> {
+  const response = await fetchApi(`/tasks/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(fields),
+  })
+  return response.json() as Promise<TaskResponse>
+}
+
 export async function fetchTask(id: string): Promise<TaskResponse> {
   const response = await fetchApi(`/tasks/${id}`)
   return response.json() as Promise<TaskResponse>

@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchTask, completeTask, reopenTask, deleteTask, createTask } from '../api.ts'
+import { useDebouncedCallback } from 'use-debounce'
+import { fetchTask, updateTask, completeTask, reopenTask, deleteTask, createTask } from '../api.ts'
+import type { TaskResponse } from '../types.ts'
 import Checkbox from '../components/Checkbox.tsx'
 import Loading from '../components/Loading.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
@@ -12,18 +14,68 @@ type Props = {
 
 export default function TaskDetailPage({ taskId, onBack }: Props) {
   if (taskId) {
-    return <ExistingTaskDetail taskId={taskId} onBack={onBack} />
+    return <ExistingTaskLoader taskId={taskId} onBack={onBack} />
   }
-  return <NewTaskDetail onBack={onBack} />
+  return <TaskForm initialTitle="" initialDetails="" task={null} onBack={onBack} />
 }
 
-function ExistingTaskDetail({ taskId, onBack }: { taskId: string; onBack: () => void }) {
-  const queryClient = useQueryClient()
-
+function ExistingTaskLoader({ taskId, onBack }: { taskId: string; onBack: () => void }) {
   const { data: task, isLoading, error } = useQuery({
     queryKey: ['tasks', taskId],
     queryFn: () => fetchTask(taskId),
   })
+
+  if (isLoading) {
+    return (
+      <DetailShell onBack={onBack}>
+        <Loading />
+      </DetailShell>
+    )
+  }
+
+  if (error || !task) {
+    return (
+      <DetailShell onBack={onBack}>
+        <ErrorMessage message="Failed to load task." />
+      </DetailShell>
+    )
+  }
+
+  // key={taskId} ensures the form resets if we navigate between tasks
+  return (
+    <TaskForm
+      key={taskId}
+      initialTitle={task.title}
+      initialDetails={task.details}
+      task={task}
+      onBack={onBack}
+    />
+  )
+}
+
+const DEBOUNCE_MS = 200
+
+type TaskFormProps = {
+  initialTitle: string
+  initialDetails: string
+  task: TaskResponse | null  // null = new task
+  onBack: () => void
+}
+
+function TaskForm({ initialTitle, initialDetails, task, onBack }: TaskFormProps) {
+  const queryClient = useQueryClient()
+  const [title, setTitle] = useState(initialTitle)
+  const [details, setDetails] = useState(initialDetails)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  // Once a new task is created, we promote it to an "existing" task by storing its ID here.
+  const [createdId, setCreatedId] = useState<string | null>(null)
+  const taskId = task?.id ?? createdId
+
+  const createPendingRef = useRef(false)
+  // Track latest values so the create callback can detect drift and follow up with a PATCH
+  const titleRef = useRef(title)
+  const detailsRef = useRef(details)
 
   const completeMutation = useMutation({
     mutationFn: completeTask,
@@ -47,8 +99,43 @@ function ExistingTaskDetail({ taskId, onBack }: { taskId: string; onBack: () => 
     },
   })
 
+  function patchTask(id: string, patchTitle: string, patchDetails: string) {
+    return updateTask(id, { title: patchTitle, details: patchDetails })
+      .then(() => queryClient.invalidateQueries({ queryKey: ['tasks'] }))
+      .catch(() => setSaveError('Failed to save changes.'))
+  }
+
+  const debouncedSave = useDebouncedCallback(
+    (currentTitle: string, currentDetails: string, currentTaskId: string | null) => {
+      setSaveError(null)
+      if (currentTaskId) {
+        patchTask(currentTaskId, currentTitle, currentDetails)
+      } else if (currentTitle.trim() !== '' && !createPendingRef.current) {
+        createPendingRef.current = true
+        createTask(currentTitle.trim(), currentDetails)
+          .then((created) => {
+            createPendingRef.current = false
+            setCreatedId(created.id)
+            queryClient.invalidateQueries({ queryKey: ['tasks'] })
+            // If the user kept typing while the create was in flight,
+            // the debounce skipped those saves. Catch up with a PATCH now.
+            const latestTitle = titleRef.current
+            const latestDetails = detailsRef.current
+            if (latestTitle !== currentTitle || latestDetails !== currentDetails) {
+              patchTask(created.id, latestTitle, latestDetails)
+            }
+          })
+          .catch(() => {
+            createPendingRef.current = false
+            setSaveError('Failed to save task.')
+          })
+      }
+    },
+    DEBOUNCE_MS,
+  )
+
   function handleCheckbox() {
-    if (!task) return
+    if (!task || !taskId) return
     if (task.completedAt) {
       reopenMutation.mutate(taskId)
     } else {
@@ -57,27 +144,15 @@ function ExistingTaskDetail({ taskId, onBack }: { taskId: string; onBack: () => 
   }
 
   function handleDelete() {
-    deleteMutation.mutate(taskId)
+    if (taskId) {
+      deleteMutation.mutate(taskId)
+    } else {
+      onBack()
+    }
   }
 
-  if (isLoading) {
-    return (
-      <DetailShell onBack={onBack}>
-        <Loading />
-      </DetailShell>
-    )
-  }
-
-  if (error || !task) {
-    return (
-      <DetailShell onBack={onBack}>
-        <ErrorMessage message="Failed to load task." />
-      </DetailShell>
-    )
-  }
-
-  const isCompleted = !!task.completedAt
-  const displayTitle = task.title || '(unnamed)'
+  const isCompleted = !!task?.completedAt
+  const displayTitle = title || '(unnamed)'
 
   return (
     <DetailShell onBack={onBack} onDelete={handleDelete}>
@@ -87,78 +162,33 @@ function ExistingTaskDetail({ taskId, onBack }: { taskId: string; onBack: () => 
             checked={isCompleted}
             onClick={handleCheckbox}
             displayTitle={displayTitle}
+            disabled={!taskId}
           />
-          <span className={`text-lg text-gray-900`}>
-            {displayTitle}
-          </span>
+          <input
+            type="text"
+            value={title}
+            onChange={e => { setTitle(e.target.value); titleRef.current = e.target.value; debouncedSave(e.target.value, details, taskId) }}
+            placeholder="Task name"
+            autoFocus={!task}
+            className="flex-1 text-lg text-gray-900 border-none outline-none placeholder-gray-400 bg-transparent"
+          />
         </div>
       </div>
 
       <div className="px-4 py-3">
         <textarea
-          readOnly
-          value={task.details}
-          placeholder="No details"
-          className="w-full h-32 border border-gray-200 rounded p-2 text-sm text-gray-700 bg-gray-50 resize-none"
-        />
-      </div>
-    </DetailShell>
-  )
-}
-
-// TODO: we can combine a lot between ExistingTaskDetail and NewTaskDetail when we implement auto update
-function NewTaskDetail({ onBack }: { onBack: () => void }) {
-  const queryClient = useQueryClient()
-  const [title, setTitle] = useState('')
-  const [details, setDetails] = useState('')
-
-  const createMutation = useMutation({
-    mutationFn: () => createTask(title.trim(), details),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      onBack()
-    },
-  })
-
-  function handleSave() {
-    if (title.trim() === '') return
-    createMutation.mutate()
-  }
-
-  return (
-    <DetailShell onBack={onBack}>
-      <div className="px-4 py-3 border-b border-gray-200">
-        <input
-          type="text"
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          placeholder="Task name"
-          autoFocus
-          className="w-full text-lg text-gray-900 border-none outline-none placeholder-gray-400"
-        />
-      </div>
-
-      <div className="px-4 py-3">
-        <textarea
           value={details}
-          onChange={e => setDetails(e.target.value)}
+          onChange={e => { setDetails(e.target.value); detailsRef.current = e.target.value; debouncedSave(title, e.target.value, taskId) }}
           placeholder="Details (optional)"
           className="w-full h-32 border border-gray-200 rounded p-2 text-sm text-gray-700 resize-none"
         />
       </div>
 
-      <div className="px-4">
-        {createMutation.error && (
-          <p className="text-red-600 text-sm mb-2">Failed to create task.</p>
-        )}
-        <button
-          onClick={handleSave}
-          disabled={title.trim() === '' || createMutation.isPending}
-          className="w-full bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-50"
-        >
-          {createMutation.isPending ? 'Creating...' : 'Create Task'}
-        </button>
-      </div>
+      {saveError && (
+        <div className="px-4">
+          <p className="text-red-600 text-sm">{saveError}</p>
+        </div>
+      )}
     </DetailShell>
   )
 }

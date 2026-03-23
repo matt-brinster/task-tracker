@@ -82,6 +82,32 @@ taskRouter.get('/:id', async (req, res) => {
   res.json(toTaskResponse(task))
 })
 
+taskRouter.patch('/:id', async (req, res) => {
+  const task = await findTaskById(req.userId, req.params.id)
+  if (!task) {
+    res.status(404).json({ error: 'Task not found' })
+    return
+  }
+
+  const { title, details } = req.body
+  if (title !== undefined && typeof title !== 'string') {
+    res.status(400).json({ error: 'title must be a string' })
+    return
+  }
+  if (details !== undefined && typeof details !== 'string') {
+    res.status(400).json({ error: 'details must be a string' })
+    return
+  }
+
+  const updated: typeof task = {
+    ...task,
+    ...(title !== undefined ? { title } : {}),
+    ...(details !== undefined ? { details } : {}),
+  }
+  await updateTask(task, updated)
+  res.json(toTaskResponse(updated))
+})
+
 taskRouter.delete('/:id', async (req, res) => {
   const task = await findTaskById(req.userId, req.params.id)
   if (!task) {

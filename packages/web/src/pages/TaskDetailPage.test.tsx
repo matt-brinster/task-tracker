@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import TaskDetailPage from './TaskDetailPage.tsx'
@@ -42,16 +42,16 @@ describe('TaskDetailPage — existing task', () => {
 
     renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
 
-    expect(await screen.findByText('Buy milk')).toBeDefined()
+    expect(await screen.findByDisplayValue('Buy milk')).toBeDefined()
     expect(screen.getByDisplayValue('From the store')).toBeDefined()
   })
 
-  it('displays (unnamed) for tasks with empty title', async () => {
-    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask({ title: '' }))
+  it('shows checkbox for existing tasks', async () => {
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
 
     renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
 
-    expect(await screen.findByText('(unnamed)')).toBeDefined()
+    expect(await screen.findByLabelText('Complete "Buy milk"')).toBeDefined()
   })
 
   it('calls onBack when back button is clicked', async () => {
@@ -60,7 +60,7 @@ describe('TaskDetailPage — existing task', () => {
 
     renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
 
-    await screen.findByText('Buy milk')
+    await screen.findByDisplayValue('Buy milk')
     await user.click(screen.getByLabelText('Back'))
 
     expect(onBack).toHaveBeenCalled()
@@ -86,10 +86,29 @@ describe('TaskDetailPage — existing task', () => {
 
     renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
 
-    await screen.findByText('Buy milk')
+    await screen.findByDisplayValue('Buy milk')
     await user.click(screen.getByLabelText('Delete task'))
 
     expect(vi.mocked(api.deleteTask).mock.calls[0]![0]).toBe('task-1')
+  })
+
+  it('autosaves title changes after debounce', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
+    vi.spyOn(api, 'updateTask').mockResolvedValue(makeTask({ title: 'Buy oat milk' }))
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    const titleInput = await screen.findByDisplayValue('Buy milk')
+    await user.clear(titleInput)
+    await user.type(titleInput, 'Buy oat milk')
+
+    await waitFor(() => {
+      expect(api.updateTask).toHaveBeenCalledWith('task-1', {
+        title: 'Buy oat milk',
+        details: 'From the store',
+      })
+    })
   })
 
   it('shows error state when fetch fails', async () => {
@@ -109,31 +128,56 @@ describe('TaskDetailPage — new task', () => {
     onBack.mockReset()
   })
 
-  it('renders the create form', () => {
+  it('renders the form with empty fields and delete button', () => {
     renderWithQuery(<TaskDetailPage taskId={null} onBack={onBack} />)
 
     expect(screen.getByPlaceholderText('Task name')).toBeDefined()
     expect(screen.getByPlaceholderText('Details (optional)')).toBeDefined()
-    expect(screen.getByRole('button', { name: 'Create Task' })).toBeDefined()
+    expect(screen.getByLabelText('Delete task')).toBeDefined()
   })
 
-  it('disables create button when title is empty', () => {
+  it('shows disabled checkbox before task is created', () => {
     renderWithQuery(<TaskDetailPage taskId={null} onBack={onBack} />)
 
-    const button = screen.getByRole('button', { name: 'Create Task' })
-    expect(button).toHaveProperty('disabled', true)
+    const checkbox = screen.getByRole('button', { name: /Complete/ })
+    expect(checkbox).toHaveProperty('disabled', true)
   })
 
-  it('creates a task and navigates back', async () => {
+  it('creates task via autosave when title is typed', async () => {
     const user = userEvent.setup()
-    vi.spyOn(api, 'createTask').mockResolvedValue(makeTask({ title: 'New task' }))
+    vi.spyOn(api, 'createTask').mockResolvedValue(makeTask({ id: 'new-1', title: 'New task' }))
 
     renderWithQuery(<TaskDetailPage taskId={null} onBack={onBack} />)
 
     await user.type(screen.getByPlaceholderText('Task name'), 'New task')
-    await user.click(screen.getByRole('button', { name: 'Create Task' }))
 
-    expect(api.createTask).toHaveBeenCalledWith('New task', '')
+    await waitFor(() => {
+      expect(api.createTask).toHaveBeenCalledWith('New task', '')
+    })
+  })
+
+  it('does not create when title is only whitespace', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'createTask').mockResolvedValue(makeTask())
+
+    renderWithQuery(<TaskDetailPage taskId={null} onBack={onBack} />)
+
+    await user.type(screen.getByPlaceholderText('Task name'), '   ')
+
+    // Wait longer than the debounce to be sure it doesn't fire
+    await new Promise(r => setTimeout(r, 700))
+
+    expect(api.createTask).not.toHaveBeenCalled()
+  })
+
+  it('navigates back on delete when task not yet created', async () => {
+    const user = userEvent.setup()
+
+    renderWithQuery(<TaskDetailPage taskId={null} onBack={onBack} />)
+
+    await user.click(screen.getByLabelText('Delete task'))
+
+    expect(onBack).toHaveBeenCalled()
   })
 
   it('shows error when creation fails', async () => {
@@ -143,8 +187,9 @@ describe('TaskDetailPage — new task', () => {
     renderWithQuery(<TaskDetailPage taskId={null} onBack={onBack} />)
 
     await user.type(screen.getByPlaceholderText('Task name'), 'x')
-    await user.click(screen.getByRole('button', { name: 'Create Task' }))
 
-    expect(await screen.findByText('Failed to create task.')).toBeDefined()
+    await waitFor(() => {
+      expect(screen.getByText('Failed to save task.')).toBeDefined()
+    })
   })
 })
