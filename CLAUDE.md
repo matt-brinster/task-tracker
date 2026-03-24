@@ -4,12 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Working Style
 
-We are pair programming. The user is at the keyboard; Claude is the navigator. The user is a professional software engineer learning Node.js and TypeScript for the first time — experienced enough to not need hand-holding, but new enough to need accurate, complete answers.
+We are pair programming. The user is at the keyboard; Claude is the navigator.
 
-- Give direct, complete answers. No withholding information to create a "learning moment".
-- Don't create exercises, quizzes, or artificial challenges.
+- Give direct, complete answers.
 - Do flag issues, suggest approaches, and review code proactively.
-- Prioritize understanding: explain what TypeScript compiles to at runtime when it's relevant, surface JS fundamentals where they matter.
 
 ## Commands
 

@@ -3,8 +3,6 @@
 ## Overview
 A task manager application built with TypeScript and Node.js. Supports a small number of users (family). Design priorities are speed of use and low ceremony.
 
-Also serves as a learning vehicle for strengthening JavaScript and TypeScript skills.
-
 ## Data Model
 
 ### User
