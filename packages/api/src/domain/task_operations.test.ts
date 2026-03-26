@@ -55,6 +55,12 @@ describe('reopenTask', () => {
     expect(completed.completedAt).not.toBeNull()
   })
 
+  it('clears archivedAt', () => {
+    const task = archiveTask(completeTask(createTask('user-1', 'Buy milk'), new Date()), new Date())
+    const result = reopenTask(task)
+    expect(result.archivedAt).toBeNull()
+  })
+
   it('preserves all other fields', () => {
     const task = createTask('user-1', 'Buy milk', 'from the shop', 'backlog', [blocker1])
     const completed = completeTask(task, new Date())
@@ -64,7 +70,6 @@ describe('reopenTask', () => {
     expect(result.details).toBe(task.details)
     expect(result.queue).toBe(task.queue)
     expect(result.snoozedUntil).toBe(task.snoozedUntil)
-    expect(result.archivedAt).toBe(task.archivedAt)
     expect(result.blockers).toEqual(task.blockers)
   })
 

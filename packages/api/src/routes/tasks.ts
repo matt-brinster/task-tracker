@@ -3,7 +3,7 @@ import type { Task } from '../domain/task.js'
 import { createTask } from '../domain/task.js'
 import type { Queue } from '../domain/task.js'
 import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, setQueue, addBlockers, removeBlockers } from '../domain/task_operations.js'
-import { findOpenTasks, findActiveTasks, findTaskById, insertTask, updateTask, softDeleteTask, searchTasks, archiveTasks } from '../repository/task_repository.js'
+import { findOpenTasks, findActiveTasks, findTaskById, insertTask, updateTask, softDeleteTask, searchOpenTasks, searchAllTasks, archiveTasks } from '../repository/task_repository.js'
 
 function toTaskResponse(task: Task) {
   return {
@@ -69,7 +69,19 @@ taskRouter.get('/open/search', async (req, res) => {
     res.status(400).json({ error: 'q query parameter is required' })
     return
   }
-  const tasks = await searchTasks(req.userId, q.trim())
+  const limit = Math.min(Math.max(1, Number(req.query.limit) || 100), 100)
+  const tasks = await searchOpenTasks(req.userId, q.trim(), limit)
+  res.json(tasks.map(toTaskResponse))
+})
+
+taskRouter.get('/search', async (req, res) => {
+  const q = req.query.q
+  if (typeof q !== 'string' || q.trim() === '') {
+    res.status(400).json({ error: 'q query parameter is required' })
+    return
+  }
+  const limit = Math.min(Math.max(1, Number(req.query.limit) || 100), 100)
+  const tasks = await searchAllTasks(req.userId, q.trim(), limit)
   res.json(tasks.map(toTaskResponse))
 })
 

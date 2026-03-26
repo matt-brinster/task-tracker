@@ -27,7 +27,7 @@ npm test -w web           # run tests (Vitest, watch mode)
 npm test -w web -- --run  # run tests once and exit
 ```
 
-**Test framework: Vitest.** Tests load `packages/api/.env.test` via `node --env-file=.env.test`. Copy `packages/api/.env.test.example` to `packages/api/.env.test` to get started. Integration tests require MongoDB running (`docker compose up -d`).
+**Test framework: Vitest.** Tests load `packages/api/.env.test` via `node --env-file=.env.test`. Copy `packages/api/.env.test.example` to `packages/api/.env.test` to get started. Integration tests require MongoDB running (`podman compose up -d`).
 
 **Provision CLI:**
 ```bash
@@ -43,15 +43,15 @@ npx tsx --env-file=packages/api/.env src/admin/provision-cli.ts --email name@exa
 **Phase 4: Blocker Fan-out on Delete** — complete.
 **Phase 5: Local Deployment** — complete.
 **Phase 5.5: Monorepo Restructure** — complete.
-**Phase 6: Frontend** — in progress (6a–6c complete; remaining features are independent: backlog, blockers, snooze, search, deploy).
+**Phase 6: Frontend** — in progress (6a–6c complete, search complete; remaining features are independent: backlog, blockers, snooze, deploy).
 
 Completed:
 - `packages/api/src/domain/task.ts` — `Task` type and `createTask` factory (uses UUIDv7 for IDs)
-- `packages/api/src/domain/task_operations.ts` — `completeTask`, `reopenTask`, `snoozeTask`, `wakeTask`, `deleteTask`, `addBlockers`, `removeBlockers`, `setQueue`, `archiveTask`
-- `packages/api/src/domain/task_operations.test.ts` — full test coverage for all operations above
+- `packages/api/src/domain/task_operations.ts` — `completeTask`, `reopenTask` (clears `completedAt` and `archivedAt`), `snoozeTask`, `wakeTask`, `deleteTask`, `addBlockers`, `removeBlockers`, `setQueue`, `archiveTask`
+- `packages/api/src/domain/task_operations.test.ts` — full test coverage for all operations above (41 tests)
 - `packages/api/src/domain/user.ts` — `User` type and `createUser` factory (UUIDv7 IDs, lowercases/trims email)
 - `packages/api/src/repository/client.ts` — MongoDB client and `db()` helper
-- `packages/api/src/repository/task_repository.ts` — `insertTask`, `updateTask(old, updated)` (throws if `deletedAt` set), `softDeleteTask(old, deleted)` (replaces doc + inline blocker fan-out), `removeBlockerFromAll(userId, blockerId)`, `findTaskById(userId, taskId)`, `findOpenTasks(userId, limit?)`, `findActiveTasks(userId, limit?)` (unarchived + non-deleted, includes completed), `archiveTasks(userId, taskIds, at)` (bulk sets `archivedAt`), `searchTasks(userId, query, limit?)`, document mapping (`toDocument`/`fromDocument`). Uses `task.id` as MongoDB `_id`. Queries filter out soft-deleted records by default. `fromDocument` uses `?? null` for `archivedAt` to handle pre-existing documents without the field.
+- `packages/api/src/repository/task_repository.ts` — `insertTask`, `updateTask(old, updated)` (throws if `deletedAt` set), `softDeleteTask(old, deleted)` (replaces doc + inline blocker fan-out), `removeBlockerFromAll(userId, blockerId)`, `findTaskById(userId, taskId)`, `findOpenTasks(userId, limit?)`, `findActiveTasks(userId, limit?)` (unarchived + non-deleted, includes completed), `archiveTasks(userId, taskIds, at)` (bulk sets `archivedAt`), `searchOpenTasks(userId, query, limit?)` (non-deleted, non-completed, `$text` search), `searchAllTasks(userId, query, limit?)` (non-deleted only — includes completed and archived), document mapping (`toDocument`/`fromDocument`). Uses `task.id` as MongoDB `_id`. Queries filter out soft-deleted records by default. `fromDocument` uses `?? null` for `archivedAt` to handle pre-existing documents without the field.
 - `packages/api/src/repository/user_repository.ts` — `insertUser`, `findUserById`, `findUserByEmail`
 - `packages/api/src/domain/crypto.ts` — `generateToken()` (32 random bytes, base64url) and `hashToken()` (SHA-256 hex)
 - `packages/api/src/domain/invitation.ts` — `Invitation` type and `createInvitation(userId)` factory. Returns `{ invitation, rawToken }` — raw token is handed out, only the hash is stored.
@@ -64,10 +64,10 @@ Completed:
 - `packages/api/src/routes/rate-limit.test.ts` — integration tests for both limiters (2 tests, uses `vi.mock` to override with low limits)
 - `packages/api/src/routes/app.ts` — Express app setup: JSON body parsing, request logging middleware (method, path, status, duration), rate limiting (per-IP on auth, per-user on tasks), bearer token auth middleware (hashes token → session lookup → sets `req.userId`), mounts auth routes (unauthenticated) and task routes (authenticated), global error handler (returns JSON 500). Exports `app` without calling `.listen()` (for supertest).
 - `packages/api/src/routes/auth.ts` — auth routes. `POST /auth/redeem` — accepts `{ key }`, validates invitation, creates session, returns `{ token }`. Enforces 10-session-per-invitation limit.
-- `packages/api/src/routes/tasks.ts` — task routes. Response mapped via `toTaskResponse` (excludes `userId`, `deletedAt`; includes `archivedAt`). Endpoints: `GET /tasks/open`, `GET /tasks/active` (unarchived, non-deleted — includes completed), `POST /tasks/archive` (accepts `{ taskIds }`, bulk archive), `POST /tasks`, `GET /tasks/:id`, `PATCH /tasks/:id` (accepts optional `{ title, details }` for partial updates), `DELETE /tasks/:id`, `POST /tasks/:id/{complete,reopen,snooze,wake,queue,blockers,blockers/remove}`, `GET /tasks/open/search?q=...`.
+- `packages/api/src/routes/tasks.ts` — task routes. Response mapped via `toTaskResponse` (excludes `userId`, `deletedAt`; includes `archivedAt`). Endpoints: `GET /tasks/open`, `GET /tasks/active` (unarchived, non-deleted — includes completed), `POST /tasks/archive` (accepts `{ taskIds }`, bulk archive), `POST /tasks`, `GET /tasks/:id`, `PATCH /tasks/:id` (accepts optional `{ title, details }` for partial updates), `DELETE /tasks/:id`, `POST /tasks/:id/{complete,reopen,snooze,wake,queue,blockers,blockers/remove}`, `GET /tasks/open/search?q=...` (open tasks only), `GET /tasks/search?q=...` (all non-deleted tasks including archived/completed).
 - `packages/api/src/routes/express.d.ts` — declaration merging to add `userId` to Express `Request`
 - `packages/api/src/routes/test-helpers.ts` — `createTestSession(userId)` — inserts a session and returns raw bearer token for use in tests
-- `packages/api/src/routes/tasks.test.ts` — supertest integration tests for all task endpoints (90 tests, bearer token auth)
+- `packages/api/src/routes/tasks.test.ts` — supertest integration tests for all task endpoints (220 tests, bearer token auth)
 - `packages/api/src/routes/auth.test.ts` — supertest integration tests for redeem endpoint and auth middleware (11 tests)
 - `packages/api/src/routes/app.test.ts` — app-level middleware tests (error handler)
 - `packages/api/src/index.ts` — entrypoint: runs `ensureIndexes()`, starts Express on `PORT` (default 3000)
@@ -76,7 +76,7 @@ Completed:
 - `packages/api/src/admin/provision.test.ts` — integration tests for provisioning (6 tests)
 - `Dockerfile` — multi-stage build: deps (production `node_modules`), build (compile TS into `packages/api/dist/`), final (slim runtime image with `node packages/api/dist/index.js`)
 - `.dockerignore` — excludes `node_modules`, `dist`, `.env`, `.env.test`, `*.test.ts` from build context
-- `docker-compose.yml` — `mongodb` + `app` services. `docker compose up --build` runs the full stack.
+- `docker-compose.yml` — `mongodb` + `app` services. `podman compose up --build` runs the full stack.
 - `.gitattributes` — normalizes line endings to LF in the repo (fixes CRLF/LF issues between Windows and WSL)
 
 Phase 6a (frontend scaffolding):
@@ -90,19 +90,24 @@ Phase 6a (frontend scaffolding):
 
 Phase 6b (auth):
 - `packages/web/src/auth.ts` — `getToken()`, `setToken()`, `clearToken()` wrapping `localStorage`
-- `packages/web/src/api.ts` — `fetchApi(path, options)` attaches `Bearer` header; on 401, clears token and dispatches `auth:logout` custom event (no page reload). `redeemInvitation(key)` calls `POST /auth/redeem`. `fetchActiveTasks()`, `archiveTasks(taskIds)`, `updateTask(id, { title?, details? })`, plus CRUD task functions.
-- `packages/web/src/App.tsx` — conditional rendering based on auth state (no routing — everything at `/`). Listens for `auth:logout` event to handle expired/invalid tokens gracefully.
+- `packages/web/src/api.ts` — `fetchApi(path, options)` attaches `Bearer` header; on 401, clears token and dispatches `auth:logout` custom event (no page reload). `redeemInvitation(key)` calls `POST /auth/redeem`. `fetchActiveTasks()`, `archiveTasks(taskIds)`, `searchTasks(q)` (calls `GET /tasks/search`), `updateTask(id, { title?, details? })`, plus CRUD task functions.
+- `packages/web/src/App.tsx` — conditional rendering based on auth state and current view (`list` | `detail` | `search`). Listens for `auth:logout` event to handle expired/invalid tokens gracefully.
 - `packages/web/src/pages/LoginPage.tsx` — invitation key form, calls `redeemInvitation`, stores token on success
+- `packages/web/src/hooks/useTaskMutations.ts` — shared hook returning `completeMutation` and `reopenMutation` (both invalidate `['tasks']` queries on success)
+- `packages/web/src/components/BackButton.tsx` — shared back button (upward chevron SVG), accepts `onClick` and optional `className`
 - `packages/web/src/components/Checkbox.tsx` — shared task checkbox (checked/unchecked with checkmark SVG), derives aria-label from `displayTitle` and `checked`, supports optional `disabled` prop
 - `packages/web/src/components/SectionDivider.tsx` — centered label with horizontal lines on each side
 - `packages/web/src/components/Loading.tsx` — centered "Loading..." state
 - `packages/web/src/components/ErrorMessage.tsx` — centered error message with configurable text
-- `packages/web/src/pages/TaskListPage.tsx` — main task list, uses `fetchActiveTasks`. Filters to actionable tasks (todo queue, not snoozed, not blocked). Checkbox toggles complete/reopen. "Archive completed tasks" and logout in settings section.
+- `packages/web/src/pages/TaskListPage.tsx` — main task list, uses `fetchActiveTasks`. Filters to actionable tasks (todo queue, not snoozed, not blocked). Checkbox toggles complete/reopen. Settings section: Search, Archive completed tasks, Logout.
 - `packages/web/src/pages/TaskDetailPage.tsx` — task detail/edit view. Unified flow for new and existing tasks: title and details are always editable with debounced autosave (`use-debounce`). New tasks created on first non-empty title; subsequent edits PATCHed. Delete button always visible. No explicit "Create" or "Save" button.
+- `packages/web/src/pages/SearchPage.tsx` — search view. Debounced text input (`use-debounce`, 300ms); empty input shows no results. Results include all non-deleted tasks (archived and completed). Checkbox toggles complete/reopen (reopening also clears `archivedAt`). Clicking a row navigates to task detail. Archived/completed tasks dimmed.
 - `packages/web/src/auth.test.ts` — tests for token helpers (4 tests)
-- `packages/web/src/api.test.ts` — tests for fetchApi, updateTask, and other API functions (6 tests)
+- `packages/web/src/api.test.ts` — tests for all API functions (14 tests)
 - `packages/web/src/App.test.tsx` — tests for auth guard rendering (4 tests)
 - `packages/web/src/pages/LoginPage.test.tsx` — tests for login form submission and error display (4 tests)
+- `packages/web/src/pages/TaskListPage.test.tsx` — tests for task list page (12 tests)
+- `packages/web/src/pages/SearchPage.test.tsx` — tests for search page (10 tests)
 - `packages/web/vitest.config.ts` — Vitest config with jsdom environment (no react plugin needed — vitest uses esbuild for JSX)
 - `packages/web/src/test-setup.ts` — React Testing Library cleanup between tests
 
@@ -116,13 +121,13 @@ See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
   - `src/repository/` — persistence
   - `src/routes/` — HTTP layer (Express route handlers, middleware)
   - `src/admin/` — CLI tooling (provisioning)
-- `packages/web/` — the frontend (Phase 6c complete): React SPA, Vite 7, TanStack Query, Tailwind CSS v4. No client-side routing — all UI renders at `/`, using conditional rendering based on auth state. Mobile-first layout: UI constrained to a narrow centered column (`max-w-md`) on all screen sizes. Working: auth, task list, create/edit, complete/reopen, delete, archive. Remaining independent features: backlog, blockers, snooze, search.
+- `packages/web/` — the frontend (Phase 6c + search complete): React SPA, Vite 7, TanStack Query, Tailwind CSS v4. No client-side routing — all UI renders at `/`, using conditional rendering based on auth state (`list` | `detail` | `search` views). Mobile-first layout: UI constrained to a narrow centered column (`max-w-md`) on all screen sizes. Working: auth, task list, create/edit, complete/reopen, delete, archive, search. Remaining independent features: backlog, blockers, snooze.
 
 There is **no state machine** and no derived "status" field. The domain exposes raw data; the API and UI decide how to present it. Domain predicates may be added as needed (e.g. `isComplete`, `isSnoozed`), but status display logic belongs to the presentation layer.
 
 **Soft deletes:** `deleteTask` sets `deletedAt` and scrubs `title`/`details` (PII removal). There is no restore. Deleted task documents remain for blocker reference integrity but are invisible to users.
 
-**Archive:** `archivedAt` is a timestamp on `Task`. Completed tasks stay visible in the main list until the user explicitly archives them (via bulk `POST /tasks/archive` with an array of task IDs). This avoids cache invalidation problems — completing a task doesn't remove it from the query. Unarchive is a future concern (reachable via full-text search). The frontend uses `GET /tasks/active` (unarchived, non-deleted) as its primary list endpoint. `GET /tasks/open` (non-completed, non-deleted) is retained for now but will be removed after blocker work is done.
+**Archive:** `archivedAt` is a timestamp on `Task`. Completed tasks stay visible in the main list until the user explicitly archives them (via bulk `POST /tasks/archive` with an array of task IDs). This avoids cache invalidation problems — completing a task doesn't remove it from the query. Archived tasks are reachable via search (`GET /tasks/search`). `reopenTask` clears both `completedAt` and `archivedAt` — reopening an archived task brings it back to the active list. The frontend uses `GET /tasks/active` (unarchived, non-deleted) as its primary list endpoint. `GET /tasks/open` (non-completed, non-deleted) is retained for now but will be removed after blocker work is done.
 
 **Blockers:** `blockers` is a `Blocker[]` — denormalized `{ id, title }` pairs stored as an array (not a set) to allow future priority ranking. On delete, blocker entries referencing the deleted task are removed from all tasks (inline fan-out). Title fan-out is deferred until a title update endpoint exists. Completion does not auto-remove blockers — the frontend resolves blocker status.
 

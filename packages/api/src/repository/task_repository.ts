@@ -107,9 +107,20 @@ export async function removeBlockerFromAll(userId: string, blockerId: string): P
   )
 }
 
-export async function searchTasks(userId: string, query: string, limit = 100): Promise<Task[]> {
+// Replace $text with Atlas Search ($search + fuzzy) if/when migrating to Atlas.
+// $text requires whole words; Atlas Search supports prefix/typo-tolerance out of the box.
+// Only the find() call and the index definition (indexes.ts) need to change — callers are unaffected.
+export async function searchOpenTasks(userId: string, query: string, limit = 100): Promise<Task[]> {
   const docs = await collection()
     .find({ userId, deletedAt: null, completedAt: null, $text: { $search: query } })
+    .limit(limit)
+    .toArray()
+  return docs.map(fromDocument)
+}
+
+export async function searchAllTasks(userId: string, query: string, limit = 100): Promise<Task[]> {
+  const docs = await collection()
+    .find({ userId, deletedAt: null, $text: { $search: query } })
     .limit(limit)
     .toArray()
   return docs.map(fromDocument)
