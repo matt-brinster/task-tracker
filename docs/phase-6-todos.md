@@ -66,3 +66,4 @@ from the query, so there's no shadow state to maintain. Unarchive is a future co
 - [ ] Animations between list and detail screens
 - [ ] Shop for an icon library to replace inline SVGs
 - [ ] Handle long words
+- [ ] Visual treatment for archived tasks in search results

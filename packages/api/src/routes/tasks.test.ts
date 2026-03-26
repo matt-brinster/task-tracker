@@ -829,7 +829,7 @@ describe('POST /tasks/:id/wake', () => {
   })
 })
 
-describe('GET /tasks/search', () => {
+describe('GET /tasks/open/search', () => {
   it('returns 400 when q is missing', async () => {
     const res = await request(app)
       .get('/tasks/open/search')
