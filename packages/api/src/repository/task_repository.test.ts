@@ -2,8 +2,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { client } from './client.js'
 import { db } from './client.js'
 import { createTask } from '../domain/task.js'
-import { completeTask, deleteTask, snoozeTask } from '../domain/task_operations.js'
-import { insertTask, updateTask, softDeleteTask, findTaskById, findOpenTasks, searchTasks, fromDocument } from './task_repository.js'
+import { completeTask, deleteTask, snoozeTask, archiveTask } from '../domain/task_operations.js'
+import { insertTask, updateTask, softDeleteTask, findTaskById, findOpenTasks, searchOpenTasks, searchAllTasks, fromDocument } from './task_repository.js'
 import { ensureIndexes } from './indexes.js'
 import type { TaskDocument } from './task_repository.js'
 
@@ -209,12 +209,12 @@ describe('task repository', () => {
     })
   })
 
-  describe('searchTasks', () => {
+  describe('searchOpenTasks', () => {
     it('finds tasks matching a word in the title', async () => {
       await insertTask(createTask('user-1', 'Buy groceries'))
       await insertTask(createTask('user-1', 'Walk the dog'))
 
-      const results = await searchTasks('user-1', 'groceries')
+      const results = await searchOpenTasks('user-1', 'groceries')
       expect(results).toHaveLength(1)
       expect(results[0]!.title).toBe('Buy groceries')
     })
@@ -222,7 +222,7 @@ describe('task repository', () => {
     it('finds tasks matching a word in the details', async () => {
       await insertTask(createTask('user-1', 'Errand', 'pick up milk from the store'))
 
-      const results = await searchTasks('user-1', 'milk')
+      const results = await searchOpenTasks('user-1', 'milk')
       expect(results).toHaveLength(1)
       expect(results[0]!.title).toBe('Errand')
     })
@@ -231,7 +231,7 @@ describe('task repository', () => {
       await insertTask(createTask('user-1', 'Buy milk'))
       await insertTask(createTask('user-2', 'Buy milk'))
 
-      const results = await searchTasks('user-1', 'milk')
+      const results = await searchOpenTasks('user-1', 'milk')
       expect(results).toHaveLength(1)
       expect(results[0]!.userId).toBe('user-1')
     })
@@ -241,7 +241,7 @@ describe('task repository', () => {
       await insertTask(task)
       await updateTask(task, completeTask(task, new Date()))
 
-      const results = await searchTasks('user-1', 'milk')
+      const results = await searchOpenTasks('user-1', 'milk')
       expect(results).toHaveLength(0)
     })
 
@@ -250,14 +250,14 @@ describe('task repository', () => {
       await insertTask(task)
       await softDeleteTask(task, deleteTask(task, new Date()))
 
-      const results = await searchTasks('user-1', 'milk')
+      const results = await searchOpenTasks('user-1', 'milk')
       expect(results).toHaveLength(0)
     })
 
     it('returns an empty array when nothing matches', async () => {
       await insertTask(createTask('user-1', 'Buy milk'))
 
-      const results = await searchTasks('user-1', 'zebra')
+      const results = await searchOpenTasks('user-1', 'zebra')
       expect(results).toHaveLength(0)
     })
 
@@ -266,7 +266,80 @@ describe('task repository', () => {
       await insertTask(createTask('user-1', 'Buy eggs'))
       await insertTask(createTask('user-1', 'Buy bread'))
 
-      const results = await searchTasks('user-1', 'buy', 2)
+      const results = await searchOpenTasks('user-1', 'buy', 2)
+      expect(results).toHaveLength(2)
+    })
+  })
+
+  describe('searchAllTasks', () => {
+    it('finds tasks matching a word in the title', async () => {
+      await insertTask(createTask('user-1', 'Buy groceries'))
+      await insertTask(createTask('user-1', 'Walk the dog'))
+
+      const results = await searchAllTasks('user-1', 'groceries')
+      expect(results).toHaveLength(1)
+      expect(results[0]!.title).toBe('Buy groceries')
+    })
+
+    it('finds tasks matching a word in the details', async () => {
+      await insertTask(createTask('user-1', 'Errand', 'pick up milk from the store'))
+
+      const results = await searchAllTasks('user-1', 'milk')
+      expect(results).toHaveLength(1)
+      expect(results[0]!.title).toBe('Errand')
+    })
+
+    it('includes completed tasks', async () => {
+      const task = createTask('user-1', 'Buy milk')
+      await insertTask(task)
+      await updateTask(task, completeTask(task, new Date()))
+
+      const results = await searchAllTasks('user-1', 'milk')
+      expect(results).toHaveLength(1)
+      expect(results[0]!.completedAt).not.toBeNull()
+    })
+
+    it('includes archived tasks', async () => {
+      const task = createTask('user-1', 'Buy milk')
+      await insertTask(task)
+      await updateTask(task, archiveTask(task, new Date()))
+
+      const results = await searchAllTasks('user-1', 'milk')
+      expect(results).toHaveLength(1)
+      expect(results[0]!.archivedAt).not.toBeNull()
+    })
+
+    it('excludes soft-deleted tasks', async () => {
+      const task = createTask('user-1', 'Buy milk')
+      await insertTask(task)
+      await softDeleteTask(task, deleteTask(task, new Date()))
+
+      const results = await searchAllTasks('user-1', 'milk')
+      expect(results).toHaveLength(0)
+    })
+
+    it('excludes tasks belonging to other users', async () => {
+      await insertTask(createTask('user-1', 'Buy milk'))
+      await insertTask(createTask('user-2', 'Buy milk'))
+
+      const results = await searchAllTasks('user-1', 'milk')
+      expect(results).toHaveLength(1)
+      expect(results[0]!.userId).toBe('user-1')
+    })
+
+    it('returns an empty array when nothing matches', async () => {
+      await insertTask(createTask('user-1', 'Buy milk'))
+
+      const results = await searchAllTasks('user-1', 'zebra')
+      expect(results).toHaveLength(0)
+    })
+
+    it('respects the limit parameter', async () => {
+      await insertTask(createTask('user-1', 'Buy milk'))
+      await insertTask(createTask('user-1', 'Buy eggs'))
+      await insertTask(createTask('user-1', 'Buy bread'))
+
+      const results = await searchAllTasks('user-1', 'buy', 2)
       expect(results).toHaveLength(2)
     })
   })

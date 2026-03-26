@@ -11,9 +11,10 @@ type Props = {
   onLogout: () => void
   onTaskClick: (taskId: string) => void
   onNewTask: () => void
+  onSearch: () => void
 }
 
-export default function TaskListPage({ onLogout, onTaskClick, onNewTask }: Props) {
+export default function TaskListPage({ onLogout, onTaskClick, onNewTask, onSearch }: Props) {
   const queryClient = useQueryClient()
 
   const { data: tasks, isLoading, error } = useQuery({
@@ -98,6 +99,12 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask }: Props
 
           <div className="mt-4">
             <SectionDivider label="Settings" />
+            <button
+              onClick={onSearch}
+              className="w-full py-3 text-center text-gray-500 hover:text-gray-700"
+            >
+              Search
+            </button>
             <button
               onClick={handleArchiveCompleted}
               disabled={archiveMutation.isPending || completedTasks.length === 0}

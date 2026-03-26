@@ -3,10 +3,12 @@ import { getToken } from './auth.ts'
 import LoginPage from './pages/LoginPage.tsx'
 import TaskListPage from './pages/TaskListPage.tsx'
 import TaskDetailPage from './pages/TaskDetailPage.tsx'
+import SearchPage from './pages/SearchPage.tsx'
 
 type View =
   | { page: 'list' }
   | { page: 'detail'; taskId: string | null }
+  | { page: 'search' }
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(() => getToken() !== null)
@@ -31,16 +33,24 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="mx-auto max-w-md min-h-screen flex flex-col bg-white">
-        {view.page === 'list' ? (
+        {view.page === 'list' && (
           <TaskListPage
             onLogout={() => setLoggedIn(false)}
             onTaskClick={(taskId) => setView({ page: 'detail', taskId })}
             onNewTask={() => setView({ page: 'detail', taskId: null })}
+            onSearch={() => setView({ page: 'search' })}
           />
-        ) : (
+        )}
+        {view.page === 'detail' && (
           <TaskDetailPage
             taskId={view.taskId}
             onBack={() => setView({ page: 'list' })}
+          />
+        )}
+        {view.page === 'search' && (
+          <SearchPage
+            onBack={() => setView({ page: 'list' })}
+            onTaskClick={(taskId) => setView({ page: 'detail', taskId })}
           />
         )}
       </div>

@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   fetchApi, redeemInvitation, ApiError,
-  fetchOpenTasks, createTask, fetchTask, updateTask, completeTask, reopenTask, deleteTask,
+  fetchOpenTasks, fetchActiveTasks, archiveTasks, searchTasks,
+  createTask, fetchTask, updateTask, completeTask, reopenTask, deleteTask,
 } from './api.ts'
 import { setToken, getToken } from './auth.ts'
 
@@ -12,6 +13,7 @@ const sampleTask = {
   queue: 'todo',
   completedAt: null,
   snoozedUntil: null,
+  archivedAt: null,
   blockers: [],
 }
 
@@ -96,6 +98,81 @@ describe('fetchOpenTasks', () => {
     const [url, options] = vi.mocked(fetch).mock.calls[0]!
     expect(url).toBe('/api/tasks/open')
     expect(options!.method).toBeUndefined()
+  })
+})
+
+describe('fetchActiveTasks', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls GET /tasks/active and returns the task list', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([sampleTask]), { status: 200 })
+    )
+
+    const tasks = await fetchActiveTasks()
+
+    expect(tasks).toEqual([sampleTask])
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/active')
+    expect(options!.method).toBeUndefined()
+  })
+})
+
+describe('archiveTasks', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls POST /tasks/archive with taskIds and returns the count', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ archivedCount: 2 }), { status: 200 })
+    )
+
+    const result = await archiveTasks(['task-1', 'task-2'])
+
+    expect(result).toEqual({ archivedCount: 2 })
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/archive')
+    expect(options!.method).toBe('POST')
+    expect(JSON.parse(options!.body as string)).toEqual({ taskIds: ['task-1', 'task-2'] })
+  })
+})
+
+describe('searchTasks', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls GET /tasks/search with encoded query and returns results', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([sampleTask]), { status: 200 })
+    )
+
+    const tasks = await searchTasks('buy milk')
+
+    expect(tasks).toEqual([sampleTask])
+    const [url] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/search?q=buy%20milk')
+  })
+
+  it('encodes special characters in the query', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), { status: 200 })
+    )
+
+    await searchTasks('foo & bar')
+
+    const [url] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/search?q=foo%20%26%20bar')
   })
 })
 

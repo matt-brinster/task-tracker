@@ -32,6 +32,7 @@ describe('TaskListPage', () => {
   const onLogout = vi.fn()
   const onTaskClick = vi.fn()
   const onNewTask = vi.fn()
+  const onSearch = vi.fn()
 
   beforeEach(() => {
     localStorage.clear()
@@ -39,13 +40,14 @@ describe('TaskListPage', () => {
     onLogout.mockReset()
     onTaskClick.mockReset()
     onNewTask.mockReset()
+    onSearch.mockReset()
   })
 
   it('displays loading state initially', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockReturnValue(new Promise(() => {}))
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onSearch={onSearch} />
     )
 
     expect(screen.getByText('Loading...')).toBeDefined()
@@ -55,7 +57,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(makeTasks('Buy milk', 'Walk dog'))
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onSearch={onSearch} />
     )
 
     expect(await screen.findByText('Buy milk')).toBeDefined()
@@ -66,7 +68,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(makeTasks(''))
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onSearch={onSearch} />
     )
 
     expect(await screen.findByText('(unnamed)')).toBeDefined()
@@ -77,7 +79,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(makeTasks('Buy milk'))
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onSearch={onSearch} />
     )
 
     const taskTitle = await screen.findByText('Buy milk')
@@ -91,7 +93,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue([])
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onSearch={onSearch} />
     )
 
     await screen.findByText('+ Task')
@@ -109,7 +111,7 @@ describe('TaskListPage', () => {
     })
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onSearch={onSearch} />
     )
 
     const checkbox = await screen.findByLabelText('Complete "Buy milk"')
@@ -124,7 +126,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onSearch={onSearch} />
     )
 
     expect(await screen.findByText('Active task')).toBeDefined()
@@ -137,7 +139,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onSearch={onSearch} />
     )
 
     expect(await screen.findByText('Active task')).toBeDefined()
@@ -148,10 +150,34 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockRejectedValue(new Error('Network error'))
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onSearch={onSearch} />
     )
 
     expect(await screen.findByText('Failed to load tasks.')).toBeDefined()
+  })
+
+  it('shows the Search button', async () => {
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue([])
+
+    renderWithQuery(
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onSearch={onSearch} />
+    )
+
+    expect(await screen.findByText('Search')).toBeDefined()
+  })
+
+  it('calls onSearch when Search is clicked', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue([])
+
+    renderWithQuery(
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onSearch={onSearch} />
+    )
+
+    await screen.findByText('Search')
+    await user.click(screen.getByText('Search'))
+
+    expect(onSearch).toHaveBeenCalled()
   })
 
   it('calls onLogout and clears token when Logout is clicked', async () => {
@@ -159,7 +185,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue([])
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} />
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onSearch={onSearch} />
     )
 
     await screen.findByText('+ Task')

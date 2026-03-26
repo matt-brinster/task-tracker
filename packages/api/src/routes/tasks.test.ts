@@ -939,6 +939,132 @@ describe('GET /tasks/search', () => {
   })
 })
 
+describe('GET /tasks/search', () => {
+  it('returns 400 when q is missing', async () => {
+    const res = await request(app)
+      .get('/tasks/search')
+      .set(...auth(token1))
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/q query parameter is required/)
+  })
+
+  it('returns 400 when q is empty', async () => {
+    const res = await request(app)
+      .get('/tasks/search?q=')
+      .set(...auth(token1))
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/q query parameter is required/)
+  })
+
+  it('returns 400 when q is only whitespace', async () => {
+    const res = await request(app)
+      .get('/tasks/search?q=%20%20')
+      .set(...auth(token1))
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/q query parameter is required/)
+  })
+
+  it('returns matching tasks', async () => {
+    await insertTask(createTask('user-1', 'Buy groceries', 'milk and eggs'))
+    await insertTask(createTask('user-1', 'Fix the roof'))
+
+    const res = await request(app)
+      .get('/tasks/search?q=groceries')
+      .set(...auth(token1))
+
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].title).toBe('Buy groceries')
+  })
+
+  it('returns completed tasks', async () => {
+    const task = createTask('user-1', 'Buy groceries')
+    await insertTask(task)
+    await updateTask(task, completeTask(task, new Date()))
+
+    const res = await request(app)
+      .get('/tasks/search?q=groceries')
+      .set(...auth(token1))
+
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].completedAt).not.toBeNull()
+  })
+
+  it('returns archived tasks', async () => {
+    const task = createTask('user-1', 'Buy groceries')
+    await insertTask(task)
+    await updateTask(task, archiveTask(task, new Date()))
+
+    const res = await request(app)
+      .get('/tasks/search?q=groceries')
+      .set(...auth(token1))
+
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].archivedAt).not.toBeNull()
+  })
+
+  it('does not return deleted tasks', async () => {
+    const task = createTask('user-1', 'Buy groceries')
+    await insertTask(task)
+    await softDeleteTask(task, deleteTask(task, new Date()))
+
+    const res = await request(app)
+      .get('/tasks/search?q=groceries')
+      .set(...auth(token1))
+
+    expect(res.body).toEqual([])
+  })
+
+  it('returns an empty array when nothing matches', async () => {
+    await insertTask(createTask('user-1', 'Buy groceries'))
+
+    const res = await request(app)
+      .get('/tasks/search?q=unicorn')
+      .set(...auth(token1))
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual([])
+  })
+
+  it('does not return tasks belonging to other users', async () => {
+    await insertTask(createTask('user-1', 'Buy groceries'))
+    await insertTask(createTask('user-2', 'Buy groceries'))
+
+    const res = await request(app)
+      .get('/tasks/search?q=groceries')
+      .set(...auth(token1))
+
+    expect(res.body).toHaveLength(1)
+  })
+
+  it('does not include userId or deletedAt in the response', async () => {
+    await insertTask(createTask('user-1', 'Buy groceries'))
+
+    const res = await request(app)
+      .get('/tasks/search?q=groceries')
+      .set(...auth(token1))
+
+    expect(res.body[0]).not.toHaveProperty('userId')
+    expect(res.body[0]).not.toHaveProperty('deletedAt')
+  })
+
+  it('matches on details text', async () => {
+    await insertTask(createTask('user-1', 'Shopping', 'need bananas'))
+
+    const res = await request(app)
+      .get('/tasks/search?q=bananas')
+      .set(...auth(token1))
+
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].title).toBe('Shopping')
+  })
+})
+
 describe('POST /tasks/:id/queue', () => {
   it('moves a task to backlog', async () => {
     const task = createTask('user-1', 'Buy milk')

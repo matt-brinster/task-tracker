@@ -6,7 +6,7 @@ export function completeTask(task: Task, at: Date): Task {
 
 // completeTask/reopenTask are inverses: completeTask sets completedAt, reopenTask clears it.
 export function reopenTask(task: Task): Task {
-  return { ...task, completedAt: null }
+  return { ...task, completedAt: null, archivedAt: null }
 }
 
 // snoozeTask/wakeTask are inverses: snooze sets snoozedUntil, wake clears it.
