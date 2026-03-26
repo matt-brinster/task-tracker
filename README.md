@@ -5,12 +5,13 @@ A task manager for family use. Monorepo with an Express API backend and a React 
 ## Prerequisites
 
 - Node.js 22+
-- Docker and Docker Compose (for MongoDB)
+- Docker/Podman and Compose (for MongoDB)
 
 ## Setup
 
 ```bash
 npm install
+cp .env.example .env
 cp packages/api/.env.example packages/api/.env
 cp packages/api/.env.test.example packages/api/.env.test
 ```
