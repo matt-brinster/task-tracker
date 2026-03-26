@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useDebouncedCallback } from 'use-debounce'
-import { searchTasks, completeTask, reopenTask } from '../api.ts'
+import { searchTasks } from '../api.ts'
+import { useTaskMutations } from '../hooks/useTaskMutations.ts'
 import type { TaskResponse } from '../types.ts'
+import BackButton from '../components/BackButton.tsx'
 import Checkbox from '../components/Checkbox.tsx'
 
 type Props = {
@@ -13,7 +15,7 @@ type Props = {
 export default function SearchPage({ onBack, onTaskClick }: Props) {
   const [input, setInput] = useState('')
   const [query, setQuery] = useState('')
-  const queryClient = useQueryClient()
+  const { completeMutation, reopenMutation } = useTaskMutations()
 
   const setQueryDebounced = useDebouncedCallback((value: string) => {
     setQuery(value)
@@ -30,16 +32,6 @@ export default function SearchPage({ onBack, onTaskClick }: Props) {
     enabled: query.length > 0,
   })
 
-  const completeMutation = useMutation({
-    mutationFn: completeTask,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
-  })
-
-  const reopenMutation = useMutation({
-    mutationFn: reopenTask,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
-  })
-
   function handleCheckbox(task: TaskResponse) {
     if (task.completedAt) {
       reopenMutation.mutate(task.id)
@@ -53,15 +45,7 @@ export default function SearchPage({ onBack, onTaskClick }: Props) {
   return (
     <div className="flex-1 flex flex-col">
       <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-200">
-        <button
-          onClick={onBack}
-          className="text-gray-600 hover:text-gray-900 shrink-0"
-          aria-label="Back"
-        >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-          </svg>
-        </button>
+        <BackButton onClick={onBack} className="shrink-0" />
         <input
           type="search"
           value={input}

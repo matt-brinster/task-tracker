@@ -1,8 +1,10 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDebouncedCallback } from 'use-debounce'
-import { fetchTask, updateTask, completeTask, reopenTask, deleteTask, createTask } from '../api.ts'
+import { fetchTask, updateTask, deleteTask, createTask } from '../api.ts'
+import { useTaskMutations } from '../hooks/useTaskMutations.ts'
 import type { TaskResponse } from '../types.ts'
+import BackButton from '../components/BackButton.tsx'
 import Checkbox from '../components/Checkbox.tsx'
 import Loading from '../components/Loading.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
@@ -77,19 +79,7 @@ function TaskForm({ initialTitle, initialDetails, task, onBack }: TaskFormProps)
   const titleRef = useRef(title)
   const detailsRef = useRef(details)
 
-  const completeMutation = useMutation({
-    mutationFn: completeTask,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-    },
-  })
-
-  const reopenMutation = useMutation({
-    mutationFn: reopenTask,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-    },
-  })
+  const { completeMutation, reopenMutation } = useTaskMutations()
 
   const deleteMutation = useMutation({
     mutationFn: deleteTask,
@@ -203,15 +193,7 @@ function DetailShell({ onBack, onDelete, children }: {
   return (
     <div className="flex-1 flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-        <button
-          onClick={onBack}
-          className="text-gray-600 hover:text-gray-900"
-          aria-label="Back"
-        >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-          </svg>
-        </button>
+        <BackButton onClick={onBack} />
         {onDelete && (
           <button
             onClick={onDelete}

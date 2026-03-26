@@ -93,6 +93,8 @@ Phase 6b (auth):
 - `packages/web/src/api.ts` — `fetchApi(path, options)` attaches `Bearer` header; on 401, clears token and dispatches `auth:logout` custom event (no page reload). `redeemInvitation(key)` calls `POST /auth/redeem`. `fetchActiveTasks()`, `archiveTasks(taskIds)`, `searchTasks(q)` (calls `GET /tasks/search`), `updateTask(id, { title?, details? })`, plus CRUD task functions.
 - `packages/web/src/App.tsx` — conditional rendering based on auth state and current view (`list` | `detail` | `search`). Listens for `auth:logout` event to handle expired/invalid tokens gracefully.
 - `packages/web/src/pages/LoginPage.tsx` — invitation key form, calls `redeemInvitation`, stores token on success
+- `packages/web/src/hooks/useTaskMutations.ts` — shared hook returning `completeMutation` and `reopenMutation` (both invalidate `['tasks']` queries on success)
+- `packages/web/src/components/BackButton.tsx` — shared back button (upward chevron SVG), accepts `onClick` and optional `className`
 - `packages/web/src/components/Checkbox.tsx` — shared task checkbox (checked/unchecked with checkmark SVG), derives aria-label from `displayTitle` and `checked`, supports optional `disabled` prop
 - `packages/web/src/components/SectionDivider.tsx` — centered label with horizontal lines on each side
 - `packages/web/src/components/Loading.tsx` — centered "Loading..." state

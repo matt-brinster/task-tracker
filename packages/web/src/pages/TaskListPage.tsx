@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchActiveTasks, completeTask, reopenTask, archiveTasks } from '../api.ts'
+import { fetchActiveTasks, archiveTasks } from '../api.ts'
+import { useTaskMutations } from '../hooks/useTaskMutations.ts'
 import type { TaskResponse } from '../types.ts'
 import { clearToken } from '../auth.ts'
 import Checkbox from '../components/Checkbox.tsx'
@@ -16,24 +17,11 @@ type Props = {
 
 export default function TaskListPage({ onLogout, onTaskClick, onNewTask, onSearch }: Props) {
   const queryClient = useQueryClient()
+  const { completeMutation, reopenMutation } = useTaskMutations()
 
   const { data: tasks, isLoading, error } = useQuery({
     queryKey: ['tasks', 'active'],
     queryFn: fetchActiveTasks,
-  })
-
-  const completeMutation = useMutation({
-    mutationFn: completeTask,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-    },
-  })
-
-  const reopenMutation = useMutation({
-    mutationFn: reopenTask,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-    },
   })
 
   const archiveMutation = useMutation({
