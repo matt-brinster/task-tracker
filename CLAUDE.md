@@ -43,7 +43,7 @@ npx tsx --env-file=packages/api/.env src/admin/provision-cli.ts --email name@exa
 **Phase 4: Blocker Fan-out on Delete** — complete.
 **Phase 5: Local Deployment** — complete.
 **Phase 5.5: Monorepo Restructure** — complete.
-**Phase 6: Frontend** — in progress (6a scaffolding complete, 6b auth complete, 6c in progress).
+**Phase 6: Frontend** — in progress (6a–6c complete; remaining features are independent: backlog, blockers, snooze, search, deploy).
 
 Completed:
 - `packages/api/src/domain/task.ts` — `Task` type and `createTask` factory (uses UUIDv7 for IDs)
@@ -97,8 +97,8 @@ Phase 6b (auth):
 - `packages/web/src/components/SectionDivider.tsx` — centered label with horizontal lines on each side
 - `packages/web/src/components/Loading.tsx` — centered "Loading..." state
 - `packages/web/src/components/ErrorMessage.tsx` — centered error message with configurable text
-- `packages/web/src/pages/TaskListPage.tsx` — main task list, uses `fetchActiveTasks`. Completed tasks stay in place (no separate section). Checkbox toggles complete/reopen. "Archive completed tasks" button in settings section. No shadow state — completion derived from `task.completedAt`.
-- `packages/web/src/pages/TaskDetailPage.tsx` — task detail/edit view. Unified flow for new and existing tasks: title and details are always editable with debounced autosave (`use-debounce`). Both fields styled with visible borders and blue focus rings. New tasks are created on the server when the user first types a non-empty title; subsequent edits are PATCHed. Delete button is always visible (navigates back if task not yet created, otherwise deletes). No explicit "Create" or "Save" button.
+- `packages/web/src/pages/TaskListPage.tsx` — main task list, uses `fetchActiveTasks`. Filters to actionable tasks (todo queue, not snoozed, not blocked). Checkbox toggles complete/reopen. "Archive completed tasks" and logout in settings section.
+- `packages/web/src/pages/TaskDetailPage.tsx` — task detail/edit view. Unified flow for new and existing tasks: title and details are always editable with debounced autosave (`use-debounce`). New tasks created on first non-empty title; subsequent edits PATCHed. Delete button always visible. No explicit "Create" or "Save" button.
 - `packages/web/src/auth.test.ts` — tests for token helpers (4 tests)
 - `packages/web/src/api.test.ts` — tests for fetchApi, updateTask, and other API functions (6 tests)
 - `packages/web/src/App.test.tsx` — tests for auth guard rendering (4 tests)
@@ -116,7 +116,7 @@ See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
   - `src/repository/` — persistence
   - `src/routes/` — HTTP layer (Express route handlers, middleware)
   - `src/admin/` — CLI tooling (provisioning)
-- `packages/web/` — the frontend (Phase 6b complete): React SPA, Vite 7, TanStack Query, Tailwind CSS v4. No client-side routing — all UI renders at `/`, using conditional rendering based on auth state. Mobile-first layout: UI constrained to a narrow centered column (`max-w-md`) on all screen sizes.
+- `packages/web/` — the frontend (Phase 6c complete): React SPA, Vite 7, TanStack Query, Tailwind CSS v4. No client-side routing — all UI renders at `/`, using conditional rendering based on auth state. Mobile-first layout: UI constrained to a narrow centered column (`max-w-md`) on all screen sizes. Working: auth, task list, create/edit, complete/reopen, delete, archive. Remaining independent features: backlog, blockers, snooze, search.
 
 There is **no state machine** and no derived "status" field. The domain exposes raw data; the API and UI decide how to present it. Domain predicates may be added as needed (e.g. `isComplete`, `isSnoozed`), but status display logic belongs to the presentation layer.
 
