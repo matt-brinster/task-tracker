@@ -92,8 +92,8 @@ export async function deleteTask(id: string): Promise<void> {
   await fetchApi(`/tasks/${id}`, { method: 'DELETE' })
 }
 
-export async function searchTasks(q: string): Promise<TaskResponse[]> {
-  const response = await fetchApi(`/tasks/search?q=${encodeURIComponent(q)}`)
+export async function searchTasks(q: string, limit = 10): Promise<TaskResponse[]> {
+  const response = await fetchApi(`/tasks/search?q=${encodeURIComponent(q)}&limit=${limit}`)
   return response.json() as Promise<TaskResponse[]>
 }
 

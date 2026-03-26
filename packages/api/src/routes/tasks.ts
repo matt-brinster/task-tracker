@@ -69,7 +69,8 @@ taskRouter.get('/open/search', async (req, res) => {
     res.status(400).json({ error: 'q query parameter is required' })
     return
   }
-  const tasks = await searchOpenTasks(req.userId, q.trim())
+  const limit = Math.min(Math.max(1, Number(req.query.limit) || 100), 100)
+  const tasks = await searchOpenTasks(req.userId, q.trim(), limit)
   res.json(tasks.map(toTaskResponse))
 })
 
@@ -79,7 +80,8 @@ taskRouter.get('/search', async (req, res) => {
     res.status(400).json({ error: 'q query parameter is required' })
     return
   }
-  const tasks = await searchAllTasks(req.userId, q.trim())
+  const limit = Math.min(Math.max(1, Number(req.query.limit) || 100), 100)
+  const tasks = await searchAllTasks(req.userId, q.trim(), limit)
   res.json(tasks.map(toTaskResponse))
 })
 

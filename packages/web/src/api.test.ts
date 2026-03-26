@@ -160,7 +160,7 @@ describe('searchTasks', () => {
 
     expect(tasks).toEqual([sampleTask])
     const [url] = vi.mocked(fetch).mock.calls[0]!
-    expect(url).toBe('/api/tasks/search?q=buy%20milk')
+    expect(url).toBe('/api/tasks/search?q=buy%20milk&limit=10')
   })
 
   it('encodes special characters in the query', async () => {
@@ -172,7 +172,7 @@ describe('searchTasks', () => {
     await searchTasks('foo & bar')
 
     const [url] = vi.mocked(fetch).mock.calls[0]!
-    expect(url).toBe('/api/tasks/search?q=foo%20%26%20bar')
+    expect(url).toBe('/api/tasks/search?q=foo%20%26%20bar&limit=10')
   })
 })
 
