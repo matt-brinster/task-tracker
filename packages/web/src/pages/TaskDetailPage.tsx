@@ -1,9 +1,9 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDebouncedCallback } from 'use-debounce'
-import { fetchTask, updateTask, deleteTask, createTask } from '../api.ts'
+import { fetchTask, updateTask, deleteTask, createTask, setQueue as setQueueApi } from '../api.ts'
+import type { Queue, TaskResponse } from '../types.ts'
 import { useTaskMutations } from '../hooks/useTaskMutations.ts'
-import type { TaskResponse } from '../types.ts'
 import BackButton from '../components/BackButton.tsx'
 import Checkbox from '../components/Checkbox.tsx'
 import Loading from '../components/Loading.tsx'
@@ -11,14 +11,15 @@ import ErrorMessage from '../components/ErrorMessage.tsx'
 
 type Props = {
   taskId: string | null  // null = new task
+  initialQueue?: Queue
   onBack: () => void
 }
 
-export default function TaskDetailPage({ taskId, onBack }: Props) {
+export default function TaskDetailPage({ taskId, initialQueue = 'todo', onBack }: Props) {
   if (taskId) {
     return <ExistingTaskLoader taskId={taskId} onBack={onBack} />
   }
-  return <TaskForm initialTitle="" initialDetails="" task={null} onBack={onBack} />
+  return <TaskForm initialTitle="" initialDetails="" task={null} initialQueue={initialQueue} onBack={onBack} />
 }
 
 function ExistingTaskLoader({ taskId, onBack }: { taskId: string; onBack: () => void }) {
@@ -50,6 +51,7 @@ function ExistingTaskLoader({ taskId, onBack }: { taskId: string; onBack: () => 
       initialTitle={task.title}
       initialDetails={task.details}
       task={task}
+      initialQueue={task.queue}
       onBack={onBack}
     />
   )
@@ -61,13 +63,15 @@ type TaskFormProps = {
   initialTitle: string
   initialDetails: string
   task: TaskResponse | null  // null = new task
+  initialQueue: Queue
   onBack: () => void
 }
 
-function TaskForm({ initialTitle, initialDetails, task, onBack }: TaskFormProps) {
+function TaskForm({ initialTitle, initialDetails, task, initialQueue, onBack }: TaskFormProps) {
   const queryClient = useQueryClient()
   const [title, setTitle] = useState(initialTitle)
   const [details, setDetails] = useState(initialDetails)
+  const [queue, setQueue] = useState<Queue>(initialQueue)
   const [saveError, setSaveError] = useState<string | null>(null)
 
   // Once a new task is created, we promote it to an "existing" task by storing its ID here.
@@ -78,6 +82,7 @@ function TaskForm({ initialTitle, initialDetails, task, onBack }: TaskFormProps)
   // Track latest values so the create callback can detect drift and follow up with a PATCH
   const titleRef = useRef(title)
   const detailsRef = useRef(details)
+  const queueRef = useRef(queue)
 
   const { completeMutation, reopenMutation } = useTaskMutations()
 
@@ -86,6 +91,13 @@ function TaskForm({ initialTitle, initialDetails, task, onBack }: TaskFormProps)
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       onBack()
+    },
+  })
+
+  const queueMutation = useMutation({
+    mutationFn: (newQueue: Queue) => setQueueApi(taskId!, newQueue),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
     },
   })
 
@@ -102,7 +114,7 @@ function TaskForm({ initialTitle, initialDetails, task, onBack }: TaskFormProps)
         patchTask(currentTaskId, currentTitle, currentDetails)
       } else if (currentTitle.trim() !== '' && !createPendingRef.current) {
         createPendingRef.current = true
-        createTask(currentTitle.trim(), currentDetails)
+        createTask(currentTitle.trim(), currentDetails, queueRef.current)
           .then((created) => {
             createPendingRef.current = false
             setCreatedId(created.id)
@@ -141,6 +153,15 @@ function TaskForm({ initialTitle, initialDetails, task, onBack }: TaskFormProps)
     }
   }
 
+  function handleQueueToggle() {
+    const newQueue = queue === 'todo' ? 'backlog' : 'todo'
+    setQueue(newQueue)
+    queueRef.current = newQueue
+    if (taskId) {
+      queueMutation.mutate(newQueue)
+    }
+  }
+
   const isCompleted = !!task?.completedAt
   const displayTitle = title || '(unnamed)'
 
@@ -176,12 +197,45 @@ function TaskForm({ initialTitle, initialDetails, task, onBack }: TaskFormProps)
         />
       </div>
 
+      <div className="px-4 py-2 flex justify-center">
+        <QueueToggle queue={queue} onToggle={handleQueueToggle} />
+      </div>
+
       {saveError && (
         <div className="px-4">
           <p className="text-red-600 text-sm">{saveError}</p>
         </div>
       )}
     </DetailShell>
+  )
+}
+
+function QueueToggle({ queue, onToggle }: { queue: Queue; onToggle: () => void }) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Task queue"
+      className="inline-flex rounded border border-gray-200 text-sm"
+    >
+      <button
+        type="button"
+        role="radio"
+        aria-checked={queue === 'todo'}
+        onClick={queue === 'todo' ? undefined : onToggle}
+        className={`px-3 py-1 rounded-l ${queue === 'todo' ? 'bg-blue-500 text-white' : 'text-gray-500 hover:text-gray-700'}`}
+      >
+        Todo
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={queue === 'backlog'}
+        onClick={queue === 'backlog' ? undefined : onToggle}
+        className={`px-3 py-1 rounded-r ${queue === 'backlog' ? 'bg-blue-500 text-white' : 'text-gray-500 hover:text-gray-700'}`}
+      >
+        Backlog
+      </button>
+    </div>
   )
 }
 

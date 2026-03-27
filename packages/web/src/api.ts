@@ -57,10 +57,10 @@ export async function archiveTasks(taskIds: string[]): Promise<{ archivedCount: 
   return response.json() as Promise<{ archivedCount: number }>
 }
 
-export async function createTask(title: string, details: string = ''): Promise<TaskResponse> {
+export async function createTask(title: string, details: string = '', queue: 'todo' | 'backlog' = 'todo'): Promise<TaskResponse> {
   const response = await fetchApi('/tasks', {
     method: 'POST',
-    body: JSON.stringify({ title, details }),
+    body: JSON.stringify({ title, details, queue }),
   })
   return response.json() as Promise<TaskResponse>
 }
@@ -95,6 +95,14 @@ export async function deleteTask(id: string): Promise<void> {
 export async function searchTasks(q: string, limit = 10): Promise<TaskResponse[]> {
   const response = await fetchApi(`/tasks/search?q=${encodeURIComponent(q)}&limit=${limit}`)
   return response.json() as Promise<TaskResponse[]>
+}
+
+export async function setQueue(id: string, queue: 'todo' | 'backlog'): Promise<TaskResponse> {
+  const response = await fetchApi(`/tasks/${id}/queue`, {
+    method: 'POST',
+    body: JSON.stringify({ queue }),
+  })
+  return response.json() as Promise<TaskResponse>
 }
 
 export async function redeemInvitation(key: string): Promise<string> {

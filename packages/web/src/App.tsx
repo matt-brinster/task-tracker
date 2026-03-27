@@ -5,9 +5,11 @@ import TaskListPage from './pages/TaskListPage.tsx'
 import TaskDetailPage from './pages/TaskDetailPage.tsx'
 import SearchPage from './pages/SearchPage.tsx'
 
+import type { Queue } from './types.ts'
+
 type View =
   | { page: 'list' }
-  | { page: 'detail'; taskId: string | null }
+  | { page: 'detail'; taskId: string | null; initialQueue?: Queue }
   | { page: 'search' }
 
 function App() {
@@ -38,12 +40,14 @@ function App() {
             onLogout={() => setLoggedIn(false)}
             onTaskClick={(taskId) => setView({ page: 'detail', taskId })}
             onNewTask={() => setView({ page: 'detail', taskId: null })}
+            onNewBacklog={() => setView({ page: 'detail', taskId: null, initialQueue: 'backlog' })}
             onSearch={() => setView({ page: 'search' })}
           />
         )}
         {view.page === 'detail' && (
           <TaskDetailPage
             taskId={view.taskId}
+            initialQueue={view.initialQueue}
             onBack={() => setView({ page: 'list' })}
           />
         )}

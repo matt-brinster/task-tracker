@@ -34,4 +34,13 @@ describe('App auth guard', () => {
 
     expect(await screen.findByText('+ Task')).toBeDefined()
   })
+
+  it('shows + Backlog button on task list', async () => {
+    setToken('valid-token')
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue([])
+
+    renderWithQuery(<App />)
+
+    expect(await screen.findByText('+ Backlog')).toBeDefined()
+  })
 })
