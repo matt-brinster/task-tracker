@@ -43,7 +43,7 @@ npx tsx --env-file=packages/api/.env src/admin/provision-cli.ts --email name@exa
 **Phase 4: Blocker Fan-out on Delete** — complete.
 **Phase 5: Local Deployment** — complete.
 **Phase 5.5: Monorepo Restructure** — complete.
-**Phase 6: Frontend** — in progress (6a–6c complete, search complete; remaining features are independent: backlog, blockers, snooze, deploy).
+**Phase 6: Frontend** — in progress (6a–6c complete, search complete, backlog complete; remaining features are independent: blockers, snooze, deploy).
 
 Completed:
 - `packages/api/src/domain/task.ts` — `Task` type and `createTask` factory (uses UUIDv7 for IDs)
@@ -99,14 +99,15 @@ Phase 6b (auth):
 - `packages/web/src/components/SectionDivider.tsx` — centered label with horizontal lines on each side
 - `packages/web/src/components/Loading.tsx` — centered "Loading..." state
 - `packages/web/src/components/ErrorMessage.tsx` — centered error message with configurable text
-- `packages/web/src/pages/TaskListPage.tsx` — main task list, uses `fetchActiveTasks`. Filters to actionable tasks (todo queue, not snoozed, not blocked). Checkbox toggles complete/reopen. Settings section: Search, Archive completed tasks, Logout.
-- `packages/web/src/pages/TaskDetailPage.tsx` — task detail/edit view. Unified flow for new and existing tasks: title and details are always editable with debounced autosave (`use-debounce`). New tasks created on first non-empty title; subsequent edits PATCHed. Delete button always visible. No explicit "Create" or "Save" button.
+- `packages/web/src/pages/TaskListPage.tsx` — main task list, uses `fetchActiveTasks`. Todo section: actionable tasks (todo queue, not snoozed, not blocked) with `+ Task` button. Backlog section: backlog-queue tasks (same filters) with `+ Backlog` button. Checkbox toggles complete/reopen. Completed tasks in both sections stay visible until archived. Settings section: Search, Archive completed tasks, Logout.
+- `packages/web/src/pages/TaskDetailPage.tsx` — task detail/edit view. Unified flow for new and existing tasks: title and details are always editable with debounced autosave (`use-debounce`). New tasks created on first non-empty title; subsequent edits PATCHed. Queue toggle (segmented Todo/Backlog radio group) — for new tasks sets queue on create, for existing tasks calls `POST /tasks/:id/queue`. Delete button always visible. No explicit "Create" or "Save" button.
 - `packages/web/src/pages/SearchPage.tsx` — search view. Debounced text input (`use-debounce`, 300ms); empty input shows no results. Results include all non-deleted tasks (archived and completed). Checkbox toggles complete/reopen (reopening also clears `archivedAt`). Clicking a row navigates to task detail. Archived/completed tasks dimmed.
 - `packages/web/src/auth.test.ts` — tests for token helpers (4 tests)
-- `packages/web/src/api.test.ts` — tests for all API functions (14 tests)
-- `packages/web/src/App.test.tsx` — tests for auth guard rendering (4 tests)
+- `packages/web/src/api.test.ts` — tests for all API functions (23 tests)
+- `packages/web/src/App.test.tsx` — tests for auth guard rendering and backlog button (3 tests)
 - `packages/web/src/pages/LoginPage.test.tsx` — tests for login form submission and error display (4 tests)
-- `packages/web/src/pages/TaskListPage.test.tsx` — tests for task list page (12 tests)
+- `packages/web/src/pages/TaskListPage.test.tsx` — tests for task list page (18 tests)
+- `packages/web/src/pages/TaskDetailPage.test.tsx` — tests for task detail page and queue toggle (22 tests)
 - `packages/web/src/pages/SearchPage.test.tsx` — tests for search page (10 tests)
 - `packages/web/vitest.config.ts` — Vitest config with jsdom environment (no react plugin needed — vitest uses esbuild for JSX)
 - `packages/web/src/test-setup.ts` — React Testing Library cleanup between tests
@@ -121,7 +122,7 @@ See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
   - `src/repository/` — persistence
   - `src/routes/` — HTTP layer (Express route handlers, middleware)
   - `src/admin/` — CLI tooling (provisioning)
-- `packages/web/` — the frontend (Phase 6c + search complete): React SPA, Vite 7, TanStack Query, Tailwind CSS v4. No client-side routing — all UI renders at `/`, using conditional rendering based on auth state (`list` | `detail` | `search` views). Mobile-first layout: UI constrained to a narrow centered column (`max-w-md`) on all screen sizes. Working: auth, task list, create/edit, complete/reopen, delete, archive, search. Remaining independent features: backlog, blockers, snooze.
+- `packages/web/` — the frontend (Phase 6c + search complete): React SPA, Vite 7, TanStack Query, Tailwind CSS v4. No client-side routing — all UI renders at `/`, using conditional rendering based on auth state (`list` | `detail` | `search` views). Mobile-first layout: UI constrained to a narrow centered column (`max-w-md`) on all screen sizes. Working: auth, task list, create/edit, complete/reopen, delete, archive, search, backlog (queue toggle + backlog section). Remaining independent features: blockers, snooze.
 
 There is **no state machine** and no derived "status" field. The domain exposes raw data; the API and UI decide how to present it. Domain predicates may be added as needed (e.g. `isComplete`, `isSnoozed`), but status display logic belongs to the presentation layer.
 

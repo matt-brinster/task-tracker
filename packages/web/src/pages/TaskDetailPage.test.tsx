@@ -152,7 +152,7 @@ describe('TaskDetailPage — new task', () => {
     await user.type(screen.getByPlaceholderText('Task name'), 'New task')
 
     await waitFor(() => {
-      expect(api.createTask).toHaveBeenCalledWith('New task', '')
+      expect(api.createTask).toHaveBeenCalledWith('New task', '', 'todo')
     })
   })
 
@@ -191,5 +191,129 @@ describe('TaskDetailPage — new task', () => {
     await waitFor(() => {
       expect(screen.getByText('Failed to save task.')).toBeDefined()
     })
+  })
+})
+
+describe('TaskDetailPage — queue toggle', () => {
+  const onBack = vi.fn()
+
+  function getTodoRadio() {
+    return screen.getByRole('radio', { name: 'Todo' })
+  }
+  function getBacklogRadio() {
+    return screen.getByRole('radio', { name: 'Backlog' })
+  }
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    onBack.mockReset()
+  })
+
+  it('has Todo selected for a todo task', async () => {
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask({ queue: 'todo' }))
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    await screen.findByRole('radiogroup', { name: 'Task queue' })
+    expect(getTodoRadio().getAttribute('aria-checked')).toBe('true')
+    expect(getBacklogRadio().getAttribute('aria-checked')).toBe('false')
+  })
+
+  it('has Backlog selected for a backlog task', async () => {
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask({ queue: 'backlog' }))
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    await screen.findByRole('radiogroup', { name: 'Task queue' })
+    expect(getBacklogRadio().getAttribute('aria-checked')).toBe('true')
+    expect(getTodoRadio().getAttribute('aria-checked')).toBe('false')
+  })
+
+  it('calls setQueue when Backlog is clicked on a todo task', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask({ queue: 'todo' }))
+    vi.spyOn(api, 'setQueue').mockResolvedValue(makeTask({ queue: 'backlog' }))
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    await screen.findByRole('radiogroup', { name: 'Task queue' })
+    await user.click(getBacklogRadio())
+
+    expect(api.setQueue).toHaveBeenCalledWith('task-1', 'backlog')
+  })
+
+  it('updates aria-checked immediately after toggle', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask({ queue: 'todo' }))
+    vi.spyOn(api, 'setQueue').mockResolvedValue(makeTask({ queue: 'backlog' }))
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    await screen.findByRole('radiogroup', { name: 'Task queue' })
+    await user.click(getBacklogRadio())
+
+    expect(getBacklogRadio().getAttribute('aria-checked')).toBe('true')
+    expect(getTodoRadio().getAttribute('aria-checked')).toBe('false')
+  })
+
+  it('new task via + Task has Todo selected', () => {
+    renderWithQuery(<TaskDetailPage taskId={null} onBack={onBack} />)
+
+    expect(getTodoRadio().getAttribute('aria-checked')).toBe('true')
+    expect(getBacklogRadio().getAttribute('aria-checked')).toBe('false')
+  })
+
+  it('new task via + Backlog has Backlog selected', () => {
+    renderWithQuery(<TaskDetailPage taskId={null} initialQueue="backlog" onBack={onBack} />)
+
+    expect(getBacklogRadio().getAttribute('aria-checked')).toBe('true')
+    expect(getTodoRadio().getAttribute('aria-checked')).toBe('false')
+  })
+
+  it('user changes mind: starts backlog, switches to todo, then types — creates with todo', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'createTask').mockResolvedValue(makeTask({ id: 'new-1', title: 'Changed mind', queue: 'todo' }))
+
+    renderWithQuery(<TaskDetailPage taskId={null} initialQueue="backlog" onBack={onBack} />)
+
+    // Switch from backlog to todo
+    await user.click(getTodoRadio())
+    expect(getTodoRadio().getAttribute('aria-checked')).toBe('true')
+
+    // Type a title to trigger autosave
+    await user.type(screen.getByPlaceholderText('Task name'), 'Changed mind')
+
+    await waitFor(() => {
+      expect(api.createTask).toHaveBeenCalledWith('Changed mind', '', 'todo')
+    })
+  })
+
+  it('user changes mind: starts todo, switches to backlog, then types — creates with backlog', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'createTask').mockResolvedValue(makeTask({ id: 'new-1', title: 'To backlog', queue: 'backlog' }))
+
+    renderWithQuery(<TaskDetailPage taskId={null} onBack={onBack} />)
+
+    // Switch from todo to backlog
+    await user.click(getBacklogRadio())
+    expect(getBacklogRadio().getAttribute('aria-checked')).toBe('true')
+
+    // Type a title to trigger autosave
+    await user.type(screen.getByPlaceholderText('Task name'), 'To backlog')
+
+    await waitFor(() => {
+      expect(api.createTask).toHaveBeenCalledWith('To backlog', '', 'backlog')
+    })
+  })
+
+  it('does not call setQueue API for new unsaved tasks', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'setQueue').mockResolvedValue(makeTask())
+
+    renderWithQuery(<TaskDetailPage taskId={null} onBack={onBack} />)
+
+    await user.click(getBacklogRadio())
+
+    expect(api.setQueue).not.toHaveBeenCalled()
   })
 })

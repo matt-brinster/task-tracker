@@ -12,10 +12,11 @@ type Props = {
   onLogout: () => void
   onTaskClick: (taskId: string) => void
   onNewTask: () => void
+  onNewBacklog: () => void
   onSearch: () => void
 }
 
-export default function TaskListPage({ onLogout, onTaskClick, onNewTask, onSearch }: Props) {
+export default function TaskListPage({ onLogout, onTaskClick, onNewTask, onNewBacklog, onSearch }: Props) {
   const queryClient = useQueryClient()
   const { completeMutation, reopenMutation } = useTaskMutations()
 
@@ -51,8 +52,14 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask, onSearc
     onLogout()
   }
 
-  const visibleTasks = tasks?.filter(t =>
+  const todoTasks = tasks?.filter(t =>
     t.queue === 'todo' &&
+    !isBlockedByOpenTask(t) &&
+    !isSnoozed(t)
+  ) ?? []
+
+  const backlogTasks = tasks?.filter(t =>
+    t.queue === 'backlog' &&
     !isBlockedByOpenTask(t) &&
     !isSnoozed(t)
   ) ?? []
@@ -68,7 +75,7 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask, onSearc
       {!isLoading && !error && (
         <div className="flex-1 overflow-y-auto">
           <ul>
-            {visibleTasks.map(task => (
+            {todoTasks.map(task => (
               <TaskRow
                 key={task.id}
                 task={task}
@@ -84,6 +91,26 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask, onSearc
           >
             + Task
           </button>
+
+          <div className="mt-4">
+            <SectionDivider label="Backlog" />
+            <ul>
+              {backlogTasks.map(task => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  onCheck={() => handleCheckbox(task)}
+                  onClick={() => onTaskClick(task.id)}
+                />
+              ))}
+            </ul>
+            <button
+              onClick={onNewBacklog}
+              className="w-full py-3 text-center text-gray-500 hover:text-gray-700"
+            >
+              + Backlog
+            </button>
+          </div>
 
           <div className="mt-4">
             <SectionDivider label="Settings" />

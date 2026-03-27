@@ -3,6 +3,7 @@ import {
   fetchApi, redeemInvitation, ApiError,
   fetchOpenTasks, fetchActiveTasks, archiveTasks, searchTasks,
   createTask, fetchTask, updateTask, completeTask, reopenTask, deleteTask,
+  setQueue,
 } from './api.ts'
 import { setToken, getToken } from './auth.ts'
 
@@ -194,10 +195,10 @@ describe('createTask', () => {
     const [url, options] = vi.mocked(fetch).mock.calls[0]!
     expect(url).toBe('/api/tasks')
     expect(options!.method).toBe('POST')
-    expect(JSON.parse(options!.body as string)).toEqual({ title: 'Buy milk', details: 'From the store' })
+    expect(JSON.parse(options!.body as string)).toEqual({ title: 'Buy milk', details: 'From the store', queue: 'todo' })
   })
 
-  it('defaults details to empty string', async () => {
+  it('defaults details to empty string and queue to todo', async () => {
     setToken('test-token')
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify(sampleTask), { status: 201 })
@@ -206,7 +207,19 @@ describe('createTask', () => {
     await createTask('Buy milk')
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
-    expect(JSON.parse(options!.body as string)).toEqual({ title: 'Buy milk', details: '' })
+    expect(JSON.parse(options!.body as string)).toEqual({ title: 'Buy milk', details: '', queue: 'todo' })
+  })
+
+  it('sends queue when provided', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ...sampleTask, queue: 'backlog' }), { status: 201 })
+    )
+
+    await createTask('Buy milk', '', 'backlog')
+
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(JSON.parse(options!.body as string)).toEqual({ title: 'Buy milk', details: '', queue: 'backlog' })
   })
 
   it('throws ApiError on non-ok response', async () => {
@@ -356,6 +369,29 @@ describe('deleteTask', () => {
     const [url, options] = vi.mocked(fetch).mock.calls[0]!
     expect(url).toBe('/api/tasks/task-1')
     expect(options!.method).toBe('DELETE')
+  })
+})
+
+describe('setQueue', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls POST /tasks/:id/queue with queue and returns updated task', async () => {
+    setToken('test-token')
+    const updated = { ...sampleTask, queue: 'backlog' }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(updated), { status: 200 })
+    )
+
+    const task = await setQueue('task-1', 'backlog')
+
+    expect(task.queue).toBe('backlog')
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/task-1/queue')
+    expect(options!.method).toBe('POST')
+    expect(JSON.parse(options!.body as string)).toEqual({ queue: 'backlog' })
   })
 })
 
