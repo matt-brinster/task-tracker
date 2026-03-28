@@ -43,7 +43,7 @@ export function fromDocument(doc: TaskDocument): Task {
     title: doc.title,
     details: doc.details,
     queue: doc.queue,
-    sortOrder: doc.sortOrder ?? "a0",
+    sortOrder: doc.sortOrder,
     completedAt: doc.completedAt,
     snoozedUntil: doc.snoozedUntil,
     deletedAt: doc.deletedAt,

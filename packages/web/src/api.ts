@@ -97,6 +97,14 @@ export async function searchTasks(q: string, limit = 10): Promise<TaskResponse[]
   return response.json() as Promise<TaskResponse[]>
 }
 
+export async function reorderTask(id: string, afterId: string | null, beforeId: string | null): Promise<TaskResponse> {
+  const response = await fetchApi(`/tasks/${id}/reorder`, {
+    method: 'POST',
+    body: JSON.stringify({ afterId, beforeId }),
+  })
+  return response.json() as Promise<TaskResponse>
+}
+
 export async function setQueue(id: string, queue: 'todo' | 'backlog'): Promise<TaskResponse> {
   const response = await fetchApi(`/tasks/${id}/queue`, {
     method: 'POST',

@@ -16,6 +16,7 @@ function makeTasks(...titles: string[]): TaskResponse[] {
     snoozedUntil: null,
     archivedAt: null,
     blockers: [],
+    sortOrder: `a${i}`,
   }))
 }
 
@@ -198,8 +199,8 @@ describe('TaskListPage', () => {
 
   it('shows backlog tasks under Backlog divider', async () => {
     const tasks: TaskResponse[] = [
-      { id: 'todo-1', title: 'Todo task', details: '', queue: 'todo', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [] },
-      { id: 'backlog-1', title: 'Backlog task', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [] },
+      { id: 'todo-1', title: 'Todo task', details: '', queue: 'todo', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [], sortOrder: 'a0' },
+      { id: 'backlog-1', title: 'Backlog task', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [], sortOrder: 'a1' },
     ]
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
@@ -214,7 +215,7 @@ describe('TaskListPage', () => {
 
   it('does not show backlog tasks in the todo section', async () => {
     const tasks: TaskResponse[] = [
-      { id: 'backlog-1', title: 'Backlog only', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [] },
+      { id: 'backlog-1', title: 'Backlog only', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [], sortOrder: 'a0' },
     ]
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
@@ -242,8 +243,8 @@ describe('TaskListPage', () => {
 
   it('filters out snoozed backlog tasks', async () => {
     const tasks: TaskResponse[] = [
-      { id: 'backlog-1', title: 'Active backlog', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [] },
-      { id: 'backlog-2', title: 'Snoozed backlog', details: '', queue: 'backlog', completedAt: null, snoozedUntil: new Date(Date.now() + 86400000).toISOString(), archivedAt: null, blockers: [] },
+      { id: 'backlog-1', title: 'Active backlog', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [], sortOrder: 'a0' },
+      { id: 'backlog-2', title: 'Snoozed backlog', details: '', queue: 'backlog', completedAt: null, snoozedUntil: new Date(Date.now() + 86400000).toISOString(), archivedAt: null, blockers: [], sortOrder: 'a1' },
     ]
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
@@ -257,8 +258,8 @@ describe('TaskListPage', () => {
 
   it('filters out blocked backlog tasks', async () => {
     const tasks: TaskResponse[] = [
-      { id: 'backlog-1', title: 'Free backlog', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [] },
-      { id: 'backlog-2', title: 'Blocked backlog', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [{ id: 'x', title: 'Blocker' }] },
+      { id: 'backlog-1', title: 'Free backlog', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [], sortOrder: 'a0' },
+      { id: 'backlog-2', title: 'Blocked backlog', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [{ id: 'x', title: 'Blocker' }], sortOrder: 'a1' },
     ]
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
@@ -272,7 +273,7 @@ describe('TaskListPage', () => {
 
   it('keeps completed backlog tasks visible until archived', async () => {
     const tasks: TaskResponse[] = [
-      { id: 'backlog-1', title: 'Done backlog', details: '', queue: 'backlog', completedAt: '2026-03-27T00:00:00Z', snoozedUntil: null, archivedAt: null, blockers: [] },
+      { id: 'backlog-1', title: 'Done backlog', details: '', queue: 'backlog', completedAt: '2026-03-27T00:00:00Z', snoozedUntil: null, archivedAt: null, blockers: [], sortOrder: 'a0' },
     ]
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 

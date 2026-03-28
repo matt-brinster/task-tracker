@@ -324,23 +324,12 @@ describe('task repository', () => {
       expect(found!.sortOrder).toBe('a1')
     })
 
-    it('defaults sortOrder to "a0" for documents missing the field', async () => {
-      // Simulate a legacy document without sortOrder
-      await db().collection('tasks').insertOne({
-        _id: 'legacy-1',
-        userId: 'user-1',
-        title: 'Legacy task',
-        details: '',
-        queue: 'todo',
-        completedAt: null,
-        snoozedUntil: null,
-        deletedAt: null,
-        archivedAt: null,
-        blockers: [],
-      })
+    it('persists sortOrder through insertTask and findTaskById', async () => {
+      const task = createTask('user-1', 'Ordered task', { sortOrder: 'a3' })
+      await insertTask(task)
 
-      const found = await findTaskById('user-1', 'legacy-1')
-      expect(found!.sortOrder).toBe('a0')
+      const found = await findTaskById('user-1', task.id)
+      expect(found!.sortOrder).toBe('a3')
     })
   })
 
