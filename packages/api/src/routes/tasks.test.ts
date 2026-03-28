@@ -45,7 +45,7 @@ describe('GET /tasks/open', () => {
   })
 
   it('returns open tasks for the authenticated user', async () => {
-    const task = createTask('user-1', 'Buy milk', 'whole milk')
+    const task = createTask('user-1', 'Buy milk', { details: 'whole milk' })
     await insertTask(task)
 
     const res = await request(app)
@@ -235,7 +235,7 @@ describe('POST /tasks/archive', () => {
 
 describe('GET /tasks/:id', () => {
   it('returns a task by id', async () => {
-    const task = createTask('user-1', 'Buy milk', 'whole milk')
+    const task = createTask('user-1', 'Buy milk', { details: 'whole milk' })
     await insertTask(task)
 
     const res = await request(app)
@@ -502,7 +502,7 @@ describe('DELETE /tasks/:id', () => {
 
 describe('PATCH /tasks/:id', () => {
   it('updates title only', async () => {
-    const task = createTask('user-1', 'Buy milk', 'whole milk')
+    const task = createTask('user-1', 'Buy milk', { details: 'whole milk' })
     await insertTask(task)
 
     const res = await request(app)
@@ -516,7 +516,7 @@ describe('PATCH /tasks/:id', () => {
   })
 
   it('updates details only', async () => {
-    const task = createTask('user-1', 'Buy milk', 'whole milk')
+    const task = createTask('user-1', 'Buy milk', { details: 'whole milk' })
     await insertTask(task)
 
     const res = await request(app)
@@ -530,7 +530,7 @@ describe('PATCH /tasks/:id', () => {
   })
 
   it('updates both title and details', async () => {
-    const task = createTask('user-1', 'Buy milk', 'whole milk')
+    const task = createTask('user-1', 'Buy milk', { details: 'whole milk' })
     await insertTask(task)
 
     const res = await request(app)
@@ -858,7 +858,7 @@ describe('GET /tasks/open/search', () => {
   })
 
   it('returns matching tasks', async () => {
-    await insertTask(createTask('user-1', 'Buy groceries', 'milk and eggs'))
+    await insertTask(createTask('user-1', 'Buy groceries', { details: 'milk and eggs' }))
     await insertTask(createTask('user-1', 'Fix the roof'))
 
     const res = await request(app)
@@ -928,7 +928,7 @@ describe('GET /tasks/open/search', () => {
   })
 
   it('matches on details text', async () => {
-    await insertTask(createTask('user-1', 'Shopping', 'need bananas'))
+    await insertTask(createTask('user-1', 'Shopping', { details: 'need bananas' }))
 
     const res = await request(app)
       .get('/tasks/open/search?q=bananas')
@@ -968,7 +968,7 @@ describe('GET /tasks/search', () => {
   })
 
   it('returns matching tasks', async () => {
-    await insertTask(createTask('user-1', 'Buy groceries', 'milk and eggs'))
+    await insertTask(createTask('user-1', 'Buy groceries', { details: 'milk and eggs' }))
     await insertTask(createTask('user-1', 'Fix the roof'))
 
     const res = await request(app)
@@ -1054,7 +1054,7 @@ describe('GET /tasks/search', () => {
   })
 
   it('matches on details text', async () => {
-    await insertTask(createTask('user-1', 'Shopping', 'need bananas'))
+    await insertTask(createTask('user-1', 'Shopping', { details: 'need bananas' }))
 
     const res = await request(app)
       .get('/tasks/search?q=bananas')
@@ -1080,7 +1080,7 @@ describe('POST /tasks/:id/queue', () => {
   })
 
   it('moves a task back to todo', async () => {
-    const task = createTask('user-1', 'Buy milk', '', 'backlog')
+    const task = createTask('user-1', 'Buy milk', { queue: 'backlog' })
     await insertTask(task)
 
     const res = await request(app)
@@ -1337,6 +1337,205 @@ describe('POST /tasks/:id/blockers/remove', () => {
       .post('/tasks/nonexistent-id/blockers/remove')
       .set(...auth(token1))
       .send({ id: 'b1' })
+
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('POST /tasks sortOrder', () => {
+  it('includes sortOrder in the response', async () => {
+    const res = await request(app)
+      .post('/tasks')
+      .set(...auth(token1))
+      .send({ title: 'First task' })
+
+    expect(res.body.sortOrder).toBeDefined()
+    expect(typeof res.body.sortOrder).toBe('string')
+  })
+
+  it('assigns increasing sortOrder to successive tasks', async () => {
+    const res1 = await request(app)
+      .post('/tasks')
+      .set(...auth(token1))
+      .send({ title: 'First' })
+
+    const res2 = await request(app)
+      .post('/tasks')
+      .set(...auth(token1))
+      .send({ title: 'Second' })
+
+    const res3 = await request(app)
+      .post('/tasks')
+      .set(...auth(token1))
+      .send({ title: 'Third' })
+
+    expect(res1.body.sortOrder < res2.body.sortOrder).toBe(true)
+    expect(res2.body.sortOrder < res3.body.sortOrder).toBe(true)
+  })
+
+  it('returns tasks sorted by sortOrder', async () => {
+    await request(app).post('/tasks').set(...auth(token1)).send({ title: 'First' })
+    await request(app).post('/tasks').set(...auth(token1)).send({ title: 'Second' })
+    await request(app).post('/tasks').set(...auth(token1)).send({ title: 'Third' })
+
+    const res = await request(app)
+      .get('/tasks/active')
+      .set(...auth(token1))
+
+    expect(res.body.map((t: { title: string }) => t.title)).toEqual(['First', 'Second', 'Third'])
+  })
+
+  it('places a task at the top when position is "top"', async () => {
+    await request(app).post('/tasks').set(...auth(token1)).send({ title: 'First' })
+    await request(app).post('/tasks').set(...auth(token1)).send({ title: 'Second' })
+
+    await request(app).post('/tasks').set(...auth(token1))
+      .send({ title: 'Top task', position: 'top' })
+
+    const list = await request(app).get('/tasks/active').set(...auth(token1))
+    expect(list.body.map((t: { title: string }) => t.title)).toEqual(['Top task', 'First', 'Second'])
+  })
+
+  it('returns 400 for invalid position', async () => {
+    const res = await request(app).post('/tasks').set(...auth(token1))
+      .send({ title: 'Bad', position: 'middle' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('position must be "top" or "bottom"')
+  })
+
+  it('assigns sortOrder independently per user', async () => {
+    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'User1 task' })
+    const r2 = await request(app).post('/tasks').set(...auth(token2)).send({ title: 'User2 task' })
+
+    // Both users' first task should get the same sortOrder (both start from empty)
+    expect(r1.body.sortOrder).toBe(r2.body.sortOrder)
+  })
+})
+
+describe('POST /tasks/:id/reorder', () => {
+  it('moves a task between two others', async () => {
+    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'A' })
+    const r2 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'B' })
+    const r3 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'C' })
+
+    // Move C between A and B
+    const res = await request(app)
+      .post(`/tasks/${r3.body.id}/reorder`)
+      .set(...auth(token1))
+      .send({ afterId: r1.body.id, beforeId: r2.body.id })
+
+    expect(res.status).toBe(200)
+    expect(res.body.sortOrder > r1.body.sortOrder).toBe(true)
+    expect(res.body.sortOrder < r2.body.sortOrder).toBe(true)
+
+    // Verify list order is now A, C, B
+    const list = await request(app).get('/tasks/active').set(...auth(token1))
+    expect(list.body.map((t: { title: string }) => t.title)).toEqual(['A', 'C', 'B'])
+  })
+
+  it('moves a task to the top (afterId null)', async () => {
+    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'A' })
+    await request(app).post('/tasks').set(...auth(token1)).send({ title: 'B' })
+    const r3 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'C' })
+
+    // Move C to the top
+    const res = await request(app)
+      .post(`/tasks/${r3.body.id}/reorder`)
+      .set(...auth(token1))
+      .send({ afterId: null, beforeId: r1.body.id })
+
+    expect(res.status).toBe(200)
+    expect(res.body.sortOrder < r1.body.sortOrder).toBe(true)
+
+    const list = await request(app).get('/tasks/active').set(...auth(token1))
+    expect(list.body.map((t: { title: string }) => t.title)).toEqual(['C', 'A', 'B'])
+  })
+
+  it('moves a task to the bottom (beforeId null)', async () => {
+    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'A' })
+    await request(app).post('/tasks').set(...auth(token1)).send({ title: 'B' })
+    const r3 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'C' })
+
+    // Move A to the bottom
+    const res = await request(app)
+      .post(`/tasks/${r1.body.id}/reorder`)
+      .set(...auth(token1))
+      .send({ afterId: r3.body.id, beforeId: null })
+
+    expect(res.status).toBe(200)
+    expect(res.body.sortOrder > r3.body.sortOrder).toBe(true)
+
+    const list = await request(app).get('/tasks/active').set(...auth(token1))
+    expect(list.body.map((t: { title: string }) => t.title)).toEqual(['B', 'C', 'A'])
+  })
+
+  it('preserves sortOrder when changing queue', async () => {
+    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'A' })
+
+    const queueRes = await request(app)
+      .post(`/tasks/${r1.body.id}/queue`)
+      .set(...auth(token1))
+      .send({ queue: 'backlog' })
+
+    expect(queueRes.body.sortOrder).toBe(r1.body.sortOrder)
+  })
+
+  it('returns 404 when the task does not exist', async () => {
+    const res = await request(app)
+      .post('/tasks/nonexistent-id/reorder')
+      .set(...auth(token1))
+      .send({ afterId: null, beforeId: null })
+
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe('Task not found')
+  })
+
+  it('returns 404 when afterId task does not exist', async () => {
+    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'A' })
+
+    const res = await request(app)
+      .post(`/tasks/${r1.body.id}/reorder`)
+      .set(...auth(token1))
+      .send({ afterId: 'nonexistent', beforeId: null })
+
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe('afterId task not found')
+  })
+
+  it('returns 404 when beforeId task does not exist', async () => {
+    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'A' })
+
+    const res = await request(app)
+      .post(`/tasks/${r1.body.id}/reorder`)
+      .set(...auth(token1))
+      .send({ afterId: null, beforeId: 'nonexistent' })
+
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe('beforeId task not found')
+  })
+
+  it('returns 400 when afterId sorts after beforeId', async () => {
+    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'A' })
+    const r2 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'B' })
+
+    // Pass them in wrong order: afterId has higher sortOrder than beforeId
+    const res = await request(app)
+      .post(`/tasks/${r1.body.id}/reorder`)
+      .set(...auth(token1))
+      .send({ afterId: r2.body.id, beforeId: r1.body.id })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('afterId must sort before beforeId')
+  })
+
+  it('does not allow reordering another user\'s task', async () => {
+    const r1 = await request(app).post('/tasks').set(...auth(token2)).send({ title: 'Their task' })
+
+    const res = await request(app)
+      .post(`/tasks/${r1.body.id}/reorder`)
+      .set(...auth(token1))
+      .send({ afterId: null, beforeId: null })
 
     expect(res.status).toBe(404)
   })

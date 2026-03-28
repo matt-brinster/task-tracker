@@ -1,9 +1,9 @@
 import { Router } from 'express'
-import type { Task } from '../domain/task.js'
+import { generateKeyBetween } from 'fractional-indexing'
+import type { Task, Queue, CreateTaskOptions } from '../domain/task.js'
 import { createTask } from '../domain/task.js'
-import type { Queue } from '../domain/task.js'
-import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, setQueue, addBlockers, removeBlockers } from '../domain/task_operations.js'
-import { findOpenTasks, findActiveTasks, findTaskById, insertTask, updateTask, softDeleteTask, searchOpenTasks, searchAllTasks, archiveTasks } from '../repository/task_repository.js'
+import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, setQueue, addBlockers, removeBlockers, reorderTask } from '../domain/task_operations.js'
+import { findOpenTasks, findActiveTasks, findTaskById, insertTask, updateTask, softDeleteTask, searchOpenTasks, searchAllTasks, archiveTasks, findMaxSortOrder, findMinSortOrder } from '../repository/task_repository.js'
 
 function toTaskResponse(task: Task) {
   return {
@@ -11,6 +11,7 @@ function toTaskResponse(task: Task) {
     title: task.title,
     details: task.details,
     queue: task.queue,
+    sortOrder: task.sortOrder,
     completedAt: task.completedAt,
     snoozedUntil: task.snoozedUntil,
     archivedAt: task.archivedAt,
@@ -58,7 +59,23 @@ taskRouter.post('/', async (req, res) => {
     return
   }
 
-  const task = createTask(req.userId, title, details, queue as Queue | undefined)
+  const { position } = req.body
+  if (position !== undefined && position !== 'top' && position !== 'bottom') {
+    res.status(400).json({ error: 'position must be "top" or "bottom"' })
+    return
+  }
+
+  let sortOrder: string
+  if (position === 'top') {
+    const minSortOrder = await findMinSortOrder(req.userId)
+    sortOrder = generateKeyBetween(null, minSortOrder)
+  } else {
+    const maxSortOrder = await findMaxSortOrder(req.userId)
+    sortOrder = generateKeyBetween(maxSortOrder, null)
+  }
+  const options: CreateTaskOptions = { details, sortOrder }
+  if (queue !== undefined) options.queue = queue as Queue
+  const task = createTask(req.userId, title, options)
   await insertTask(task)
   res.status(201).json(toTaskResponse(task))
 })
@@ -243,6 +260,57 @@ taskRouter.post('/:id/blockers/remove', async (req, res) => {
   }
 
   const updated = removeBlockers(task, new Set([id]))
+  await updateTask(task, updated)
+  res.json(toTaskResponse(updated))
+})
+
+taskRouter.post('/:id/reorder', async (req, res) => {
+  const task = await findTaskById(req.userId, req.params.id)
+  if (!task) {
+    res.status(404).json({ error: 'Task not found' })
+    return
+  }
+
+  const { afterId, beforeId } = req.body
+  if (afterId !== null && afterId !== undefined && typeof afterId !== 'string') {
+    res.status(400).json({ error: 'afterId must be a string or null' })
+    return
+  }
+  if (beforeId !== null && beforeId !== undefined && typeof beforeId !== 'string') {
+    res.status(400).json({ error: 'beforeId must be a string or null' })
+    return
+  }
+
+  let afterSortOrder: string | null = null
+  let beforeSortOrder: string | null = null
+
+  if (afterId) {
+    const afterTask = await findTaskById(req.userId, afterId)
+    if (!afterTask) {
+      res.status(404).json({ error: 'afterId task not found' })
+      return
+    }
+    afterSortOrder = afterTask.sortOrder
+  }
+
+  if (beforeId) {
+    const beforeTask = await findTaskById(req.userId, beforeId)
+    if (!beforeTask) {
+      res.status(404).json({ error: 'beforeId task not found' })
+      return
+    }
+    beforeSortOrder = beforeTask.sortOrder
+  }
+
+  let newSortOrder: string
+  try {
+    newSortOrder = generateKeyBetween(afterSortOrder, beforeSortOrder)
+  } catch (err) {
+    console.warn(`reorder failed for task ${task.id}: afterSortOrder=${afterSortOrder}, beforeSortOrder=${beforeSortOrder}`, err)
+    res.status(400).json({ error: 'afterId must sort before beforeId' })
+    return
+  }
+  const updated = reorderTask(task, newSortOrder)
   await updateTask(task, updated)
   res.json(toTaskResponse(updated))
 })

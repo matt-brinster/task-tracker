@@ -2,8 +2,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { client } from './client.js'
 import { db } from './client.js'
 import { createTask } from '../domain/task.js'
-import { completeTask, deleteTask, snoozeTask, archiveTask } from '../domain/task_operations.js'
-import { insertTask, updateTask, softDeleteTask, findTaskById, findOpenTasks, searchOpenTasks, searchAllTasks, fromDocument } from './task_repository.js'
+import { completeTask, deleteTask, snoozeTask, archiveTask, reorderTask } from '../domain/task_operations.js'
+import { insertTask, updateTask, softDeleteTask, findTaskById, findOpenTasks, findActiveTasks, findMaxSortOrder, findMinSortOrder, searchOpenTasks, searchAllTasks, fromDocument } from './task_repository.js'
 import { ensureIndexes } from './indexes.js'
 import type { TaskDocument } from './task_repository.js'
 
@@ -40,7 +40,7 @@ describe('task repository', () => {
 
     it('stores blockers as an array of objects', async () => {
       const blockers = [{ id: 'blocker-1', title: 'Task A' }, { id: 'blocker-2', title: 'Task B' }]
-      const task = createTask('user-1', 'Deploy', '', 'todo', blockers)
+      const task = createTask('user-1', 'Deploy', { blockers })
       await insertTask(task)
 
       const doc = await db().collection<TaskDocument>('tasks').findOne({ _id: task.id })
@@ -50,7 +50,7 @@ describe('task repository', () => {
 
     it('stores snoozedUntil as a Date', async () => {
       const snoozeDate = new Date('2026-04-01T12:00:00Z')
-      const task = createTask('user-1', 'Later', '', 'todo', [], snoozeDate)
+      const task = createTask('user-1', 'Later', { snoozedUntil: snoozeDate })
       await insertTask(task)
 
       const doc = await db().collection<TaskDocument>('tasks').findOne({ _id: task.id })
@@ -79,7 +79,7 @@ describe('task repository', () => {
     })
 
     it('persists a soft delete with PII scrubbed', async () => {
-      const task = createTask('user-1', 'Secret task', 'sensitive details')
+      const task = createTask('user-1', 'Secret task', { details: 'sensitive details' })
       await insertTask(task)
 
       const deleted = deleteTask(task, new Date('2026-03-10T12:00:00Z'))
@@ -199,7 +199,7 @@ describe('task repository', () => {
 
   describe('fromDocument', () => {
     it('round-trips a task through document conversion', async () => {
-      const task = createTask('user-1', 'Round trip', 'some details', 'backlog', [{ id: 'b1', title: 'Blocker' }])
+      const task = createTask('user-1', 'Round trip', { details: 'some details', queue: 'backlog', blockers: [{ id: 'b1', title: 'Blocker' }] })
       await insertTask(task)
 
       const doc = await db().collection<TaskDocument>('tasks').findOne({ _id: task.id })
@@ -220,7 +220,7 @@ describe('task repository', () => {
     })
 
     it('finds tasks matching a word in the details', async () => {
-      await insertTask(createTask('user-1', 'Errand', 'pick up milk from the store'))
+      await insertTask(createTask('user-1', 'Errand', { details: 'pick up milk from the store' }))
 
       const results = await searchOpenTasks('user-1', 'milk')
       expect(results).toHaveLength(1)
@@ -269,6 +269,137 @@ describe('task repository', () => {
       const results = await searchOpenTasks('user-1', 'buy', 2)
       expect(results).toHaveLength(2)
     })
+
+    it('ranks title matches above details matches', async () => {
+      await insertTask(createTask('user-1', 'Walk the dog', { details: 'remember milk treats' }))
+      await insertTask(createTask('user-1', 'Buy milk'))
+
+      const results = await searchOpenTasks('user-1', 'milk')
+      expect(results).toHaveLength(2)
+      expect(results[0]!.title).toBe('Buy milk')
+    })
+  })
+
+  describe('sortOrder', () => {
+    it('stores and retrieves sortOrder', async () => {
+      const task = createTask('user-1', 'Task', { sortOrder: 'a5' })
+      await insertTask(task)
+
+      const found = await findTaskById('user-1', task.id)
+      expect(found!.sortOrder).toBe('a5')
+    })
+
+    it('returns tasks sorted by sortOrder from findOpenTasks', async () => {
+      const t1 = createTask('user-1', 'Third', { sortOrder: 'a3' })
+      const t2 = createTask('user-1', 'First', { sortOrder: 'a1' })
+      const t3 = createTask('user-1', 'Second', { sortOrder: 'a2' })
+      await insertTask(t1)
+      await insertTask(t2)
+      await insertTask(t3)
+
+      const tasks = await findOpenTasks('user-1')
+      expect(tasks.map(t => t.title)).toEqual(['First', 'Second', 'Third'])
+    })
+
+    it('returns tasks sorted by sortOrder from findActiveTasks', async () => {
+      const t1 = createTask('user-1', 'C', { sortOrder: 'a3' })
+      const t2 = createTask('user-1', 'A', { sortOrder: 'a1' })
+      const t3 = createTask('user-1', 'B', { queue: 'backlog', sortOrder: 'a2' })
+      await insertTask(t1)
+      await insertTask(t2)
+      await insertTask(t3)
+
+      const tasks = await findActiveTasks('user-1')
+      expect(tasks.map(t => t.title)).toEqual(['A', 'B', 'C'])
+    })
+
+    it('persists sortOrder through updateTask', async () => {
+      const task = createTask('user-1', 'Move me', { sortOrder: 'a5' })
+      await insertTask(task)
+
+      const reordered = reorderTask(task, 'a1')
+      await updateTask(task, reordered)
+
+      const found = await findTaskById('user-1', task.id)
+      expect(found!.sortOrder).toBe('a1')
+    })
+
+    it('defaults sortOrder to "a0" for documents missing the field', async () => {
+      // Simulate a legacy document without sortOrder
+      await db().collection('tasks').insertOne({
+        _id: 'legacy-1',
+        userId: 'user-1',
+        title: 'Legacy task',
+        details: '',
+        queue: 'todo',
+        completedAt: null,
+        snoozedUntil: null,
+        deletedAt: null,
+        archivedAt: null,
+        blockers: [],
+      })
+
+      const found = await findTaskById('user-1', 'legacy-1')
+      expect(found!.sortOrder).toBe('a0')
+    })
+  })
+
+  describe('findMaxSortOrder', () => {
+    it('returns the highest sortOrder for a user', async () => {
+      await insertTask(createTask('user-1', 'A', { sortOrder: 'a1' }))
+      await insertTask(createTask('user-1', 'B', { sortOrder: 'a5' }))
+      await insertTask(createTask('user-1', 'C', { sortOrder: 'a3' }))
+
+      const max = await findMaxSortOrder('user-1')
+      expect(max).toBe('a5')
+    })
+
+    it('returns null when the user has no tasks', async () => {
+      const max = await findMaxSortOrder('user-1')
+      expect(max).toBeNull()
+    })
+
+    it('excludes deleted tasks', async () => {
+      const task = createTask('user-1', 'Deleted', { sortOrder: 'a9' })
+      await insertTask(task)
+      await softDeleteTask(task, deleteTask(task, new Date()))
+
+      const max = await findMaxSortOrder('user-1')
+      expect(max).toBeNull()
+    })
+
+    it('is scoped to the requesting user', async () => {
+      await insertTask(createTask('user-1', 'Low', { sortOrder: 'a1' }))
+      await insertTask(createTask('user-2', 'High', { sortOrder: 'a9' }))
+
+      const max = await findMaxSortOrder('user-1')
+      expect(max).toBe('a1')
+    })
+  })
+
+  describe('findMinSortOrder', () => {
+    it('returns the lowest sortOrder for a user', async () => {
+      await insertTask(createTask('user-1', 'A', { sortOrder: 'a5' }))
+      await insertTask(createTask('user-1', 'B', { sortOrder: 'a1' }))
+      await insertTask(createTask('user-1', 'C', { sortOrder: 'a3' }))
+
+      const min = await findMinSortOrder('user-1')
+      expect(min).toBe('a1')
+    })
+
+    it('returns null when the user has no tasks', async () => {
+      const min = await findMinSortOrder('user-1')
+      expect(min).toBeNull()
+    })
+
+    it('excludes deleted tasks', async () => {
+      const task = createTask('user-1', 'Deleted', { sortOrder: 'a1' })
+      await insertTask(task)
+      await softDeleteTask(task, deleteTask(task, new Date()))
+
+      const min = await findMinSortOrder('user-1')
+      expect(min).toBeNull()
+    })
   })
 
   describe('searchAllTasks', () => {
@@ -282,7 +413,7 @@ describe('task repository', () => {
     })
 
     it('finds tasks matching a word in the details', async () => {
-      await insertTask(createTask('user-1', 'Errand', 'pick up milk from the store'))
+      await insertTask(createTask('user-1', 'Errand', { details: 'pick up milk from the store' }))
 
       const results = await searchAllTasks('user-1', 'milk')
       expect(results).toHaveLength(1)
@@ -341,6 +472,15 @@ describe('task repository', () => {
 
       const results = await searchAllTasks('user-1', 'buy', 2)
       expect(results).toHaveLength(2)
+    })
+
+    it('ranks title matches above details matches', async () => {
+      await insertTask(createTask('user-1', 'Walk the dog', { details: 'remember milk treats' }))
+      await insertTask(createTask('user-1', 'Buy milk'))
+
+      const results = await searchAllTasks('user-1', 'milk')
+      expect(results).toHaveLength(2)
+      expect(results[0]!.title).toBe('Buy milk')
     })
   })
 })

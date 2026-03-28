@@ -38,19 +38,19 @@ describe('createTask', () => {
   })
 
   it('accepts a backlog queue', () => {
-    const task = createTask('user-1', 'Buy milk', '', 'backlog')
+    const task = createTask('user-1', 'Buy milk', { queue: 'backlog' })
     expect(task.queue).toBe('backlog')
   })
 
   it('accepts blockers', () => {
     const blockers = [{ id: 'id-1', title: 'Task 1' }, { id: 'id-2', title: 'Task 2' }]
-    const task = createTask('user-1', 'Buy milk', '', 'todo', blockers)
+    const task = createTask('user-1', 'Buy milk', { blockers })
     expect(task.blockers).toEqual(blockers)
   })
 
   it('accepts a snoozedUntil date', () => {
     const date = new Date('2026-04-01')
-    const task = createTask('user-1', 'Buy milk', '', 'todo', [], date)
+    const task = createTask('user-1', 'Buy milk', { snoozedUntil: date })
     expect(task.snoozedUntil).toEqual(date)
   })
 
@@ -63,5 +63,15 @@ describe('createTask', () => {
   it('trims whitespace from title', () => {
     const task = createTask('user-1', '  Buy milk  ')
     expect(task.title).toBe('Buy milk')
+  })
+
+  it('defaults sortOrder to "a0"', () => {
+    const task = createTask('user-1', 'Buy milk')
+    expect(task.sortOrder).toBe('a0')
+  })
+
+  it('accepts a custom sortOrder', () => {
+    const task = createTask('user-1', 'Buy milk', { sortOrder: 'a5' })
+    expect(task.sortOrder).toBe('a5')
   })
 })

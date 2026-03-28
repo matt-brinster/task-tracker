@@ -39,3 +39,7 @@ export function setQueue(task: Task, queue: Queue): Task {
 export function archiveTask(task: Task, at: Date): Task {
   return { ...task, archivedAt: at }
 }
+
+export function reorderTask(task: Task, sortOrder: string): Task {
+  return { ...task, sortOrder }
+}

@@ -13,6 +13,7 @@ export type Task = {
   title: string
   details: string
   queue: Queue
+  sortOrder: string
   completedAt: Date | null
   snoozedUntil: Date | null
   deletedAt: Date | null
@@ -20,13 +21,23 @@ export type Task = {
   blockers: Blocker[]
 }
 
-export function createTask(userId: string, title: string, details: string = "", queue: Queue = 'todo', blockers: Blocker[] = [], snoozedUntil: Date | null = null): Task {
+export type CreateTaskOptions = {
+  details?: string
+  queue?: Queue
+  blockers?: Blocker[]
+  snoozedUntil?: Date | null
+  sortOrder?: string
+}
+
+export function createTask(userId: string, title: string, options: CreateTaskOptions = {}): Task {
+  const { details = "", queue = "todo", blockers = [], snoozedUntil = null, sortOrder = "a0" } = options
   return {
     id: uuidv7(),
     userId,
     title: title.trim(),
     details,
     queue,
+    sortOrder,
     completedAt: null,
     snoozedUntil,
     deletedAt: null,
