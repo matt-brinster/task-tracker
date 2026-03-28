@@ -11,6 +11,7 @@ export type TaskDocument = {
   title: string
   details: string
   queue: Queue
+  sortOrder: string
   completedAt: Date | null
   snoozedUntil: Date | null
   deletedAt: Date | null
@@ -25,6 +26,7 @@ function toDocument(task: Task): TaskDocument {
     title: task.title,
     details: task.details,
     queue: task.queue,
+    sortOrder: task.sortOrder,
     completedAt: task.completedAt,
     snoozedUntil: task.snoozedUntil,
     deletedAt: task.deletedAt,
@@ -41,6 +43,7 @@ export function fromDocument(doc: TaskDocument): Task {
     title: doc.title,
     details: doc.details,
     queue: doc.queue,
+    sortOrder: doc.sortOrder ?? "a0",
     completedAt: doc.completedAt,
     snoozedUntil: doc.snoozedUntil,
     deletedAt: doc.deletedAt,
@@ -79,6 +82,7 @@ export async function findTaskById(userId: string, taskId: string): Promise<Task
 export async function findOpenTasks(userId: string, limit = 1000): Promise<Task[]> {
   const docs = await collection()
     .find({ userId, deletedAt: null, completedAt: null })
+    .sort({ sortOrder: 1 })
     .limit(limit)
     .toArray()
   return docs.map(fromDocument)
@@ -87,6 +91,7 @@ export async function findOpenTasks(userId: string, limit = 1000): Promise<Task[
 export async function findActiveTasks(userId: string, limit = 1000): Promise<Task[]> {
   const docs = await collection()
     .find({ userId, deletedAt: null, archivedAt: null })
+    .sort({ sortOrder: 1 })
     .limit(limit)
     .toArray()
   return docs.map(fromDocument)
@@ -107,12 +112,33 @@ export async function removeBlockerFromAll(userId: string, blockerId: string): P
   )
 }
 
+export async function findMaxSortOrder(userId: string): Promise<string | null> {
+  const doc = await collection()
+    .find({ userId, deletedAt: null })
+    .sort({ sortOrder: -1 })
+    .limit(1)
+    .project({ sortOrder: 1 })
+    .next()
+  return doc?.sortOrder ?? null
+}
+
+export async function findMinSortOrder(userId: string): Promise<string | null> {
+  const doc = await collection()
+    .find({ userId, deletedAt: null })
+    .sort({ sortOrder: 1 })
+    .limit(1)
+    .project({ sortOrder: 1 })
+    .next()
+  return doc?.sortOrder ?? null
+}
+
 // Replace $text with Atlas Search ($search + fuzzy) if/when migrating to Atlas.
 // $text requires whole words; Atlas Search supports prefix/typo-tolerance out of the box.
 // Only the find() call and the index definition (indexes.ts) need to change — callers are unaffected.
 export async function searchOpenTasks(userId: string, query: string, limit = 100): Promise<Task[]> {
   const docs = await collection()
-    .find({ userId, deletedAt: null, completedAt: null, $text: { $search: query } })
+    .find({ userId, deletedAt: null, completedAt: null, $text: { $search: query } }, { projection: { score: { $meta: 'textScore' } } })
+    .sort({ score: { $meta: 'textScore' } })
     .limit(limit)
     .toArray()
   return docs.map(fromDocument)
@@ -120,7 +146,8 @@ export async function searchOpenTasks(userId: string, query: string, limit = 100
 
 export async function searchAllTasks(userId: string, query: string, limit = 100): Promise<Task[]> {
   const docs = await collection()
-    .find({ userId, deletedAt: null, $text: { $search: query } })
+    .find({ userId, deletedAt: null, $text: { $search: query } }, { projection: { score: { $meta: 'textScore' } } })
+    .sort({ score: { $meta: 'textScore' } })
     .limit(limit)
     .toArray()
   return docs.map(fromDocument)
