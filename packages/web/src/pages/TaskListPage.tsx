@@ -7,9 +7,9 @@ import Checkbox from '../components/Checkbox.tsx'
 import SectionDivider from '../components/SectionDivider.tsx'
 import Loading from '../components/Loading.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
-import { useSortable, isSortable } from '@dnd-kit/react/sortable';
-import { useState } from 'react';
-import { DragDropProvider } from '@dnd-kit/react';
+import { useSortable, isSortable } from '@dnd-kit/react/sortable'
+import { useState } from 'react'
+import { DragDropProvider } from '@dnd-kit/react'
 
 type Props = {
   onLogout: () => void
@@ -73,27 +73,29 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask, onNewBa
 
   const completedTasks = tasks?.filter(t => t.completedAt !== null) ?? []
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // DragEndEvent is not exported from @dnd-kit/react
   function handleOnDragEnd(event: any) {
-    const { operation, canceled } = event;
-    if (canceled) return;
-    if (!operation.source) return;
+    const { operation, canceled } = event
+    if (canceled) return
+    if (!operation.source) return
 
     if (isSortable(operation.source)) {
       const { initialIndex: fromIndex,
         initialGroup: fromGroupName,
         index: toIndex
-      } = operation.source;
+      } = operation.source
 
-      if (fromIndex === toIndex) return;
-      const list = fromGroupName === "todo" ? todoTasks : backlogTasks;
-      const reordered = [...list];
-      const task = list[fromIndex];
+      if (fromIndex === toIndex) return
+      const list = fromGroupName === "todo" ? todoTasks : backlogTasks
+      const reordered = [...list]
+      const task = list[fromIndex]
       reordered.splice(fromIndex, 1)
       reordered.splice(toIndex, 0, task)
       const beforeId = reordered[toIndex + 1]?.id ?? null
       const afterId = reordered[toIndex - 1]?.id ?? null
-      reorderMutation.mutate({ id: task.id, beforeId, afterId });
-      return;
+      reorderMutation.mutate({ id: task.id, beforeId, afterId })
+      return
     }
   }
 
@@ -182,9 +184,9 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask, onNewBa
   )
 }
 
-function SortableTaskRow({ id, index, group, task, onCheck, onClick, disabled }: { id: string; index: number, group: string, task: TaskResponse, onCheck: () => void, onClick: () => void, disabled: boolean }) {
-  const [element, setElement] = useState<HTMLLIElement | null>(null);
-  const { handleRef } = useSortable({ id, index, element, group });
+function SortableTaskRow({ id, index, group, task, onCheck, onClick, disabled }: { id: string, index: number, group: string, task: TaskResponse, onCheck: () => void, onClick: () => void, disabled: boolean }) {
+  const [element, setElement] = useState<HTMLLIElement | null>(null)
+  const { handleRef } = useSortable({ id, index, element, group })
 
   return (
     <li ref={setElement} className="flex items-start">
@@ -200,7 +202,7 @@ function SortableTaskRow({ id, index, group, task, onCheck, onClick, disabled }:
         <GripIcon />
       </div>
     </li>
-  );
+  )
 }
 
 function CheckBoxAndClickableTaskName({ task, onCheck, onClick }: {

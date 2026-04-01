@@ -11,7 +11,7 @@ export type TaskDocument = {
   title: string
   details: string
   queue: Queue
-  sortOrder: string
+  sortOrder: string | undefined
   completedAt: Date | null
   snoozedUntil: Date | null
   deletedAt: Date | null
@@ -43,7 +43,7 @@ export function fromDocument(doc: TaskDocument): Task {
     title: doc.title,
     details: doc.details,
     queue: doc.queue,
-    sortOrder: doc.sortOrder,
+    sortOrder: doc.sortOrder ?? "a0",
     completedAt: doc.completedAt,
     snoozedUntil: doc.snoozedUntil,
     deletedAt: doc.deletedAt,
