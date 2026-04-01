@@ -43,7 +43,7 @@ npx tsx --env-file=packages/api/.env src/admin/provision-cli.ts --email name@exa
 **Phase 4: Blocker Fan-out on Delete** — complete.
 **Phase 5: Local Deployment** — complete.
 **Phase 5.5: Monorepo Restructure** — complete.
-**Phase 6: Frontend** — in progress (6a–6c complete, search complete, backlog complete; remaining features are independent: blockers, snooze, deploy).
+**Phase 6: Frontend** — in progress (6a–6c complete, search complete, backlog complete, banner/navigation complete; remaining features are independent: blockers, snooze, deploy).
 
 Completed:
 - `packages/api/src/domain/task.ts` — `Task` type (includes `sortOrder: string`), `CreateTaskOptions` type, and `createTask(userId, title, options?)` factory (uses UUIDv7 for IDs)
@@ -99,9 +99,10 @@ Phase 6b (auth):
 - `packages/web/src/components/SectionDivider.tsx` — centered label with horizontal lines on each side
 - `packages/web/src/components/Loading.tsx` — centered "Loading..." state
 - `packages/web/src/components/ErrorMessage.tsx` — centered error message with configurable text
-- `packages/web/src/pages/TaskListPage.tsx` — main task list, uses `fetchActiveTasks`. Todo section: actionable tasks (todo queue, not snoozed, not blocked) with `+ Task` button. Backlog section: backlog-queue tasks (same filters) with `+ Backlog` button. Each section wrapped in its own `DragDropProvider` (from `@dnd-kit/react`) — separate providers enforce within-group reordering only. Each task row rendered as `SortableTaskRow` (uses `useSortable` hook) with a grip handle; `handleOnDragEnd` fires `reorderTask` mutation on drop. Grip is detached during a pending reorder mutation to prevent concurrent reorders. Checkbox toggles complete/reopen. Completed tasks in both sections stay visible until archived. Settings section: Search, Archive completed tasks, Logout.
+- `packages/web/src/pages/TaskListPage.tsx` — main task list, uses `fetchActiveTasks`. Top banner: search icon (left), archive icon + gear icon (right); same `px-4 py-3 border-b` header pattern as detail/search pages. Todo section: actionable tasks (todo queue, not snoozed, not blocked) with `+ Task` button. Backlog section: backlog-queue tasks (same filters) with `+ Backlog` button. Each section wrapped in its own `DragDropProvider` (from `@dnd-kit/react`) — separate providers enforce within-group reordering only. Each task row rendered as `SortableTaskRow` (uses `useSortable` hook) with a grip handle; `handleOnDragEnd` fires `reorderTask` mutation on drop. Grip is detached during a pending reorder mutation to prevent concurrent reorders. Checkbox toggles complete/reopen. Completed tasks in both sections stay visible until archived.
 - `packages/web/src/pages/TaskDetailPage.tsx` — task detail/edit view. Unified flow for new and existing tasks: title and details are always editable with debounced autosave (`use-debounce`). New tasks created on first non-empty title; subsequent edits PATCHed. Queue toggle (segmented Todo/Backlog radio group) — for new tasks sets queue on create, for existing tasks calls `POST /tasks/:id/queue`. Delete button always visible. No explicit "Create" or "Save" button.
 - `packages/web/src/pages/SearchPage.tsx` — search view. Debounced text input (`use-debounce`, 300ms); empty input shows no results. Results include all non-deleted tasks (archived and completed). Checkbox toggles complete/reopen (reopening also clears `archivedAt`). Clicking a row navigates to task detail. Archived/completed tasks dimmed.
+- `packages/web/src/pages/SettingsPage.tsx` — settings page. Same header pattern as search/detail (back button left, "Settings" title centered). Logout button in the body (clears token, calls `onLogout`).
 - `packages/web/src/auth.test.ts` — tests for token helpers (4 tests)
 - `packages/web/src/api.test.ts` — tests for all API functions (25 tests)
 - `packages/web/src/App.test.tsx` — tests for auth guard rendering and backlog button (3 tests)
@@ -109,6 +110,7 @@ Phase 6b (auth):
 - `packages/web/src/pages/TaskListPage.test.tsx` — tests for task list page (24 tests)
 - `packages/web/src/pages/TaskDetailPage.test.tsx` — tests for task detail page and queue toggle (22 tests)
 - `packages/web/src/pages/SearchPage.test.tsx` — tests for search page (10 tests)
+- `packages/web/src/pages/SettingsPage.test.tsx` — tests for settings page (3 tests)
 - `packages/web/vitest.config.ts` — Vitest config with jsdom environment (no react plugin needed — vitest uses esbuild for JSX)
 - `packages/web/src/test-setup.ts` — React Testing Library cleanup between tests; stubs `ResizeObserver` (required by `@dnd-kit/react`, not provided by jsdom)
 
