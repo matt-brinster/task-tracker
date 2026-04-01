@@ -14,4 +14,5 @@ export type TaskResponse = {
   snoozedUntil: string | null
   archivedAt: string | null
   blockers: Blocker[]
+  sortOrder: string
 }

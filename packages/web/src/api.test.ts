@@ -3,7 +3,7 @@ import {
   fetchApi, redeemInvitation, ApiError,
   fetchOpenTasks, fetchActiveTasks, archiveTasks, searchTasks,
   createTask, fetchTask, updateTask, completeTask, reopenTask, deleteTask,
-  setQueue,
+  setQueue, reorderTask,
 } from './api.ts'
 import { setToken, getToken } from './auth.ts'
 
@@ -16,6 +16,7 @@ const sampleTask = {
   snoozedUntil: null,
   archivedAt: null,
   blockers: [],
+  sortOrder: 'a0',
 }
 
 describe('fetchApi', () => {
@@ -392,6 +393,41 @@ describe('setQueue', () => {
     expect(url).toBe('/api/tasks/task-1/queue')
     expect(options!.method).toBe('POST')
     expect(JSON.parse(options!.body as string)).toEqual({ queue: 'backlog' })
+  })
+})
+
+describe('reorderTask', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls POST /tasks/:id/reorder with beforeId and afterId and returns updated task', async () => {
+    setToken('test-token')
+    const reordered = { ...sampleTask, sortOrder: 'b0' }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(reordered), { status: 200 })
+    )
+
+    const task = await reorderTask('task-1', 'task-2', 'task-3')
+
+    expect(task.sortOrder).toBe('b0')
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/task-1/reorder')
+    expect(options!.method).toBe('POST')
+    expect(JSON.parse(options!.body as string)).toEqual({ beforeId: 'task-2', afterId: 'task-3' })
+  })
+
+  it('sends null for beforeId and afterId when not provided', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(sampleTask), { status: 200 })
+    )
+
+    await reorderTask('task-1', null, null)
+
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(JSON.parse(options!.body as string)).toEqual({ beforeId: null, afterId: null })
   })
 })
 

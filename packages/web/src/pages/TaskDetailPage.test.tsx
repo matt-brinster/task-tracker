@@ -16,6 +16,7 @@ function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
     snoozedUntil: null,
     archivedAt: null,
     blockers: [],
+    sortOrder: 'a0',
     ...overrides,
   }
 }

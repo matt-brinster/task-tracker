@@ -11,7 +11,7 @@ export type TaskDocument = {
   title: string
   details: string
   queue: Queue
-  sortOrder: string
+  sortOrder: string | undefined
   completedAt: Date | null
   snoozedUntil: Date | null
   deletedAt: Date | null
