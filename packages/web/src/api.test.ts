@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   fetchApi, redeemInvitation, ApiError,
-  fetchOpenTasks, fetchActiveTasks, archiveTasks, searchTasks,
+  fetchOpenTasks, fetchActiveTasks, archiveTasks, searchTasks, searchOpenTasks,
   createTask, fetchTask, updateTask, completeTask, reopenTask, deleteTask,
-  setQueue, reorderTask,
+  setQueue, reorderTask, addBlocker, removeBlocker,
 } from './api.ts'
 import { setToken, getToken } from './auth.ts'
 
@@ -428,6 +428,71 @@ describe('reorderTask', () => {
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     expect(JSON.parse(options!.body as string)).toEqual({ beforeId: null, afterId: null })
+  })
+})
+
+describe('searchOpenTasks', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls GET /tasks/open/search with encoded query and returns results', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([sampleTask]), { status: 200 })
+    )
+
+    const tasks = await searchOpenTasks('buy milk')
+
+    expect(tasks).toEqual([sampleTask])
+    const [url] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/open/search?q=buy%20milk&limit=10')
+  })
+})
+
+describe('addBlocker', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls POST /tasks/:id/blockers with blocker id and returns updated task', async () => {
+    setToken('test-token')
+    const updated = { ...sampleTask, blockers: [{ id: 'blocker-1', title: 'Blocking task' }] }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(updated), { status: 200 })
+    )
+
+    const task = await addBlocker('task-1', 'blocker-1')
+
+    expect(task.blockers).toEqual([{ id: 'blocker-1', title: 'Blocking task' }])
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/task-1/blockers')
+    expect(options!.method).toBe('POST')
+    expect(JSON.parse(options!.body as string)).toEqual({ id: 'blocker-1' })
+  })
+})
+
+describe('removeBlocker', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls POST /tasks/:id/blockers/remove with blocker id and returns updated task', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(sampleTask), { status: 200 })
+    )
+
+    const task = await removeBlocker('task-1', 'blocker-1')
+
+    expect(task.blockers).toEqual([])
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/task-1/blockers/remove')
+    expect(options!.method).toBe('POST')
+    expect(JSON.parse(options!.body as string)).toEqual({ id: 'blocker-1' })
   })
 })
 

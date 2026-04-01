@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { getToken } from './auth.ts'
+import { addBlocker } from './api.ts'
 import LoginPage from './pages/LoginPage.tsx'
 import TaskListPage from './pages/TaskListPage.tsx'
 import TaskDetailPage from './pages/TaskDetailPage.tsx'
@@ -10,11 +12,12 @@ import type { Queue } from './types.ts'
 
 type View =
   | { page: 'list' }
-  | { page: 'detail'; taskId: string | null; initialQueue?: Queue }
+  | { page: 'detail'; taskId: string | null; initialQueue?: Queue; pendingBlockerFor?: string }
   | { page: 'search' }
   | { page: 'settings' }
 
 function App() {
+  const queryClient = useQueryClient()
   const [loggedIn, setLoggedIn] = useState(() => getToken() !== null)
   const [view, setView] = useState<View>({ page: 'list' })
 
@@ -51,6 +54,24 @@ function App() {
             taskId={view.taskId}
             initialQueue={view.initialQueue}
             onBack={() => setView({ page: 'list' })}
+            onTaskClick={(taskId) => setView({ page: 'detail', taskId })}
+            onNewBlockerTask={
+              view.taskId !== null
+                ? () => setView({ page: 'detail', taskId: null, pendingBlockerFor: view.taskId! })
+                : undefined
+            }
+            afterCreate={
+              view.pendingBlockerFor
+                ? async (createdId) => {
+                    try {
+                      await addBlocker(view.pendingBlockerFor!, createdId)
+                      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+                    } catch {
+                      // blocker link failed silently — task was still created
+                    }
+                  }
+                : undefined
+            }
           />
         )}
         {view.page === 'search' && (

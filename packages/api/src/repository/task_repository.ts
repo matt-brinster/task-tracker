@@ -112,6 +112,14 @@ export async function removeBlockerFromAll(userId: string, blockerId: string): P
   )
 }
 
+export async function updateBlockerTitleInAll(userId: string, blockerId: string, newTitle: string): Promise<void> {
+  await collection().updateMany(
+    { userId, deletedAt: null, 'blockers.id': blockerId },
+    { $set: { 'blockers.$[elem].title': newTitle } },
+    { arrayFilters: [{ 'elem.id': blockerId }] },
+  )
+}
+
 export async function findMaxSortOrder(userId: string): Promise<string | null> {
   const doc = await collection()
     .find({ userId, deletedAt: null })

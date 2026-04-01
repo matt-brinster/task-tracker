@@ -153,9 +153,9 @@ describe('TaskListPage', () => {
     expect(screen.queryByText('Snoozed task')).toBeNull()
   })
 
-  it('filters out blocked tasks', async () => {
+  it('moves blocked tasks to the Blocked section (not in todo)', async () => {
     const tasks = makeTasks('Active task', 'Blocked task')
-    tasks[1]!.blockers = [{ id: 'other', title: 'Other task' }]
+    tasks[1]!.blockers = [{ id: 'task-1', title: 'Active task' }]
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
     renderWithQuery(
@@ -163,7 +163,9 @@ describe('TaskListPage', () => {
     )
 
     expect(await screen.findByText('Active task')).toBeDefined()
-    expect(screen.queryByText('Blocked task')).toBeNull()
+    // Blocked task appears in the Blocked section, not filtered out entirely
+    expect(screen.getByText('Blocked task')).toBeDefined()
+    expect(screen.getByText('Blocked')).toBeDefined() // section divider
   })
 
   it('shows error state when fetch fails', async () => {
@@ -271,10 +273,10 @@ describe('TaskListPage', () => {
     expect(screen.queryByText('Snoozed backlog')).toBeNull()
   })
 
-  it('filters out blocked backlog tasks', async () => {
+  it('moves blocked backlog tasks to the Blocked section (not in backlog)', async () => {
     const tasks: TaskResponse[] = [
       { id: 'backlog-1', title: 'Free backlog', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [], sortOrder: 'a0' },
-      { id: 'backlog-2', title: 'Blocked backlog', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [{ id: 'x', title: 'Blocker' }], sortOrder: 'a1' },
+      { id: 'backlog-2', title: 'Blocked backlog', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [{ id: 'backlog-1', title: 'Free backlog' }], sortOrder: 'a1' },
     ]
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
@@ -283,7 +285,9 @@ describe('TaskListPage', () => {
     )
 
     expect(await screen.findByText('Free backlog')).toBeDefined()
-    expect(screen.queryByText('Blocked backlog')).toBeNull()
+    // Blocked backlog task appears in the Blocked section
+    expect(screen.getByText('Blocked backlog')).toBeDefined()
+    expect(screen.getByText('Blocked')).toBeDefined() // section divider
   })
 
   it('keeps completed backlog tasks visible until archived', async () => {
@@ -384,6 +388,93 @@ describe('TaskListPage', () => {
     })
 
     expect(api.reorderTask).not.toHaveBeenCalled()
+  })
+
+  it('shows blocked tasks in the Blocked section', async () => {
+    const tasks: TaskResponse[] = [
+      { id: 'task-1', title: 'Free task', details: '', queue: 'todo', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [], sortOrder: 'a0' },
+      { id: 'task-2', title: 'Blocked task', details: '', queue: 'todo', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [{ id: 'task-1', title: 'Free task' }], sortOrder: 'a1' },
+    ]
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
+
+    renderWithQuery(
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+    )
+
+    expect(await screen.findByText('Free task')).toBeDefined()
+    expect(screen.getByText('Blocked task')).toBeDefined()
+    expect(screen.getByText('Blocked')).toBeDefined() // section divider
+  })
+
+  it('does not show Blocked section when no blocked tasks', async () => {
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(makeTasks('Task A'))
+
+    renderWithQuery(
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+    )
+
+    await screen.findByText('Task A')
+    expect(screen.queryByText('Blocked')).toBeNull()
+  })
+
+  it('blocked task does not appear in the todo section', async () => {
+    const tasks: TaskResponse[] = [
+      { id: 'task-1', title: 'Free task', details: '', queue: 'todo', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [], sortOrder: 'a0' },
+      { id: 'task-2', title: 'Blocked task', details: '', queue: 'todo', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [{ id: 'task-1', title: 'Free task' }], sortOrder: 'a1' },
+    ]
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
+
+    renderWithQuery(
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+    )
+
+    // Blocked task appears only once (in the Blocked section)
+    await screen.findByText('Blocked task')
+    expect(screen.getAllByText('Blocked task').length).toBe(1)
+  })
+
+  it('completed blocked task does not appear in Blocked section', async () => {
+    const tasks: TaskResponse[] = [
+      { id: 'task-2', title: 'Done blocked', details: '', queue: 'todo', completedAt: '2026-01-01T00:00:00Z', snoozedUntil: null, archivedAt: null, blockers: [{ id: 'x', title: 'Blocker' }], sortOrder: 'a0' },
+    ]
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
+
+    renderWithQuery(
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+    )
+
+    await screen.findByText('+ Task')
+    expect(screen.queryByText('Blocked')).toBeNull()
+  })
+
+  it('completed task blocked by an open task still appears in its section', async () => {
+    const tasks: TaskResponse[] = [
+      { id: 'task-1', title: 'Open blocker', details: '', queue: 'todo', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [], sortOrder: 'a0' },
+      { id: 'task-2', title: 'Done but blocked', details: '', queue: 'todo', completedAt: '2026-01-01T00:00:00Z', snoozedUntil: null, archivedAt: null, blockers: [{ id: 'task-1', title: 'Open blocker' }], sortOrder: 'a1' },
+    ]
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
+
+    renderWithQuery(
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+    )
+
+    await screen.findByText('Done but blocked')
+    expect(screen.queryByText('Blocked')).toBeNull()
+  })
+
+  it('task with a completed blocker is not considered blocked', async () => {
+    const tasks: TaskResponse[] = [
+      { id: 'blocker-1', title: 'Done blocker', details: '', queue: 'todo', completedAt: '2026-01-01T00:00:00Z', snoozedUntil: null, archivedAt: null, blockers: [], sortOrder: 'a0' },
+      { id: 'task-2', title: 'Now unblocked', details: '', queue: 'todo', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [{ id: 'blocker-1', title: 'Done blocker' }], sortOrder: 'a1' },
+    ]
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
+
+    renderWithQuery(
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+    )
+
+    await screen.findByText('Now unblocked')
+    expect(screen.queryByText('Blocked')).toBeNull()
   })
 
   it('uses the backlog list when dragging within backlog', async () => {

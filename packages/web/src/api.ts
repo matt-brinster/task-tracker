@@ -113,6 +113,27 @@ export async function setQueue(id: string, queue: 'todo' | 'backlog'): Promise<T
   return response.json() as Promise<TaskResponse>
 }
 
+export async function searchOpenTasks(q: string, limit = 10): Promise<TaskResponse[]> {
+  const response = await fetchApi(`/tasks/open/search?q=${encodeURIComponent(q)}&limit=${limit}`)
+  return response.json() as Promise<TaskResponse[]>
+}
+
+export async function addBlocker(taskId: string, blockerId: string): Promise<TaskResponse> {
+  const response = await fetchApi(`/tasks/${taskId}/blockers`, {
+    method: 'POST',
+    body: JSON.stringify({ id: blockerId }),
+  })
+  return response.json() as Promise<TaskResponse>
+}
+
+export async function removeBlocker(taskId: string, blockerId: string): Promise<TaskResponse> {
+  const response = await fetchApi(`/tasks/${taskId}/blockers/remove`, {
+    method: 'POST',
+    body: JSON.stringify({ id: blockerId }),
+  })
+  return response.json() as Promise<TaskResponse>
+}
+
 export async function redeemInvitation(key: string): Promise<string> {
   const response = await fetch('/api/auth/redeem', {
     method: 'POST',

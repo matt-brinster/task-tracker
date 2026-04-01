@@ -618,6 +618,32 @@ describe('PATCH /tasks/:id', () => {
     expect(res.status).toBe(200)
     expect(res.body.title).toBe('')
   })
+
+  it('fans out title change to blocker references in other tasks', async () => {
+    const blocker = createTask('user-1', 'Old title')
+    const dependent = createTask('user-1', 'Needs blocker')
+    await insertTask(blocker)
+    await insertTask(dependent)
+
+    // Link blocker → dependent
+    await request(app)
+      .post(`/tasks/${dependent.id}/blockers`)
+      .set(...auth(token1))
+      .send({ id: blocker.id })
+
+    // Rename the blocker task
+    await request(app)
+      .patch(`/tasks/${blocker.id}`)
+      .set(...auth(token1))
+      .send({ title: 'New title' })
+
+    // The dependent task's blocker reference should reflect the new title
+    const res = await request(app)
+      .get(`/tasks/${dependent.id}`)
+      .set(...auth(token1))
+
+    expect(res.body.blockers[0].title).toBe('New title')
+  })
 })
 
 describe('POST /tasks/:id/complete', () => {

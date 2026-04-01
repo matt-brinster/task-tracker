@@ -1,11 +1,13 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDebouncedCallback } from 'use-debounce'
-import { fetchTask, updateTask, deleteTask, createTask, setQueue as setQueueApi } from '../api.ts'
-import type { Queue, TaskResponse } from '../types.ts'
+import { fetchTask, fetchOpenTasks, updateTask, deleteTask, createTask, setQueue as setQueueApi, addBlocker, removeBlocker, searchOpenTasks } from '../api.ts'
+import type { Queue, TaskResponse, Blocker } from '../types.ts'
 import { useTaskMutations } from '../hooks/useTaskMutations.ts'
 import BackButton from '../components/BackButton.tsx'
 import Checkbox from '../components/Checkbox.tsx'
+import CheckboxRow from '../components/CheckboxRow.tsx'
+import SectionDivider from '../components/SectionDivider.tsx'
 import Loading from '../components/Loading.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
 
@@ -13,16 +15,19 @@ type Props = {
   taskId: string | null  // null = new task
   initialQueue?: Queue
   onBack: () => void
+  onTaskClick?: (taskId: string) => void
+  onNewBlockerTask?: () => void
+  afterCreate?: (createdId: string) => void
 }
 
-export default function TaskDetailPage({ taskId, initialQueue = 'todo', onBack }: Props) {
+export default function TaskDetailPage({ taskId, initialQueue = 'todo', onBack, onTaskClick, onNewBlockerTask, afterCreate }: Props) {
   if (taskId) {
-    return <ExistingTaskLoader taskId={taskId} onBack={onBack} />
+    return <ExistingTaskLoader taskId={taskId} onBack={onBack} onTaskClick={onTaskClick} onNewBlockerTask={onNewBlockerTask} />
   }
-  return <TaskForm initialTitle="" initialDetails="" task={null} initialQueue={initialQueue} onBack={onBack} />
+  return <TaskForm initialTitle="" initialDetails="" task={null} initialQueue={initialQueue} onBack={onBack} afterCreate={afterCreate} />
 }
 
-function ExistingTaskLoader({ taskId, onBack }: { taskId: string; onBack: () => void }) {
+function ExistingTaskLoader({ taskId, onBack, onTaskClick, onNewBlockerTask }: { taskId: string; onBack: () => void; onTaskClick?: (taskId: string) => void; onNewBlockerTask?: () => void }) {
   const { data: task, isLoading, error } = useQuery({
     queryKey: ['tasks', taskId],
     queryFn: () => fetchTask(taskId),
@@ -53,6 +58,8 @@ function ExistingTaskLoader({ taskId, onBack }: { taskId: string; onBack: () => 
       task={task}
       initialQueue={task.queue}
       onBack={onBack}
+      onTaskClick={onTaskClick}
+      onNewBlockerTask={onNewBlockerTask}
     />
   )
 }
@@ -65,9 +72,12 @@ type TaskFormProps = {
   task: TaskResponse | null  // null = new task
   initialQueue: Queue
   onBack: () => void
+  onTaskClick?: (taskId: string) => void
+  onNewBlockerTask?: () => void
+  afterCreate?: (createdId: string) => void
 }
 
-function TaskForm({ initialTitle, initialDetails, task, initialQueue, onBack }: TaskFormProps) {
+function TaskForm({ initialTitle, initialDetails, task, initialQueue, onBack, onTaskClick, onNewBlockerTask, afterCreate }: TaskFormProps) {
   const queryClient = useQueryClient()
   const [title, setTitle] = useState(initialTitle)
   const [details, setDetails] = useState(initialDetails)
@@ -119,6 +129,7 @@ function TaskForm({ initialTitle, initialDetails, task, initialQueue, onBack }: 
             createPendingRef.current = false
             setCreatedId(created.id)
             queryClient.invalidateQueries({ queryKey: ['tasks'] })
+            afterCreate?.(created.id)
             // If the user kept typing while the create was in flight,
             // the debounce skipped those saves. Catch up with a PATCH now.
             const latestTitle = titleRef.current
@@ -197,6 +208,10 @@ function TaskForm({ initialTitle, initialDetails, task, initialQueue, onBack }: 
         />
       </div>
 
+      {task && taskId && (
+        <BlockersSection taskId={taskId} blockers={task.blockers} onTaskClick={onTaskClick} onNewBlockerTask={onNewBlockerTask} />
+      )}
+
       <div className="px-4 py-2 flex justify-center">
         <QueueToggle queue={queue} onToggle={handleQueueToggle} />
       </div>
@@ -207,6 +222,150 @@ function TaskForm({ initialTitle, initialDetails, task, initialQueue, onBack }: 
         </div>
       )}
     </DetailShell>
+  )
+}
+
+function BlockerRow({ blocker, onRemove, onTaskClick }: { blocker: Blocker; onRemove: () => void; onTaskClick?: (taskId: string) => void }) {
+  const { completeMutation, reopenMutation } = useTaskMutations()
+  const { data: blockerTask } = useQuery({
+    queryKey: ['tasks', blocker.id],
+    queryFn: () => fetchTask(blocker.id),
+  })
+
+  const isCompleted = !!blockerTask?.completedAt
+
+  return (
+    <li className="flex items-start">
+      <CheckboxRow
+        title={blocker.title}
+        completedAt={blockerTask?.completedAt ?? null}
+        onCheck={() => isCompleted ? reopenMutation.mutate(blocker.id) : completeMutation.mutate(blocker.id)}
+        onClick={() => onTaskClick?.(blocker.id)}
+        disabled={!blockerTask}
+      />
+      <button
+        onClick={onRemove}
+        className="shrink-0 px-4 py-2 text-gray-400 hover:text-red-500"
+        aria-label={`Remove blocker "${blocker.title || '(unnamed)'}"`}
+      >
+        <SmallXIcon />
+      </button>
+    </li>
+  )
+}
+
+function BlockersSection({ taskId, blockers, onTaskClick, onNewBlockerTask }: { taskId: string; blockers: Blocker[]; onTaskClick?: (taskId: string) => void; onNewBlockerTask?: () => void }) {
+  const queryClient = useQueryClient()
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<TaskResponse[]>([])
+
+  const { data: openTasks } = useQuery({
+    queryKey: ['openTasks'],
+    queryFn: fetchOpenTasks,
+    enabled: searchOpen,
+  })
+
+  const debouncedSearch = useDebouncedCallback(async (q: string) => {
+    if (!q.trim()) { setSearchResults([]); return }
+    try {
+      setSearchResults(await searchOpenTasks(q, 5))
+    } catch {
+      setSearchResults([])
+    }
+  }, 300)
+
+  const removeMutation = useMutation({
+    mutationFn: (blockerId: string) => removeBlocker(taskId, blockerId),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tasks'] }) },
+  })
+
+  const addMutation = useMutation({
+    mutationFn: (blockerId: string) => addBlocker(taskId, blockerId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      closeSearch()
+    },
+  })
+
+  function closeSearch() {
+    setSearchOpen(false)
+    setSearchQuery('')
+    setSearchResults([])
+  }
+
+  const blockerIds = new Set(blockers.map(b => b.id))
+  const candidates = searchQuery.trim()
+    ? searchResults
+    : (openTasks ?? []).slice(0, 5)
+  const filteredCandidates = candidates.filter(t => t.id !== taskId && !blockerIds.has(t.id))
+
+  return (
+    <div className="pb-2">
+      <SectionDivider label="Blockers" />
+      <ul className="mt-1">
+        {blockers.map(blocker => (
+          <BlockerRow
+            key={blocker.id}
+            blocker={blocker}
+            onRemove={() => removeMutation.mutate(blocker.id)}
+            onTaskClick={onTaskClick}
+          />
+        ))}
+      </ul>
+      {!searchOpen && (
+        <div className="flex justify-center mt-2">
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
+            + Blocker
+          </button>
+        </div>
+      )}
+      {searchOpen && (
+        <div className="px-4 mt-2">
+          <div className="flex items-center gap-2">
+            <BackButton onClick={closeSearch} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); debouncedSearch(e.target.value) }}
+              placeholder="Search tasks..."
+              autoFocus
+              className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+            />
+          </div>
+          <ul className="border border-gray-200 rounded mt-1 divide-y divide-gray-100 max-h-40 overflow-y-auto">
+            {filteredCandidates.map(result => (
+              <li key={result.id}>
+                <button
+                  onClick={() => addMutation.mutate(result.id)}
+                  disabled={addMutation.isPending}
+                  className="w-full text-left px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {result.title || '(unnamed)'}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            onClick={() => { closeSearch(); onNewBlockerTask?.() }}
+            className="w-full py-3 text-center text-gray-500 hover:text-gray-700"
+          >
+            + New blocker
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SmallXIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
   )
 }
 
