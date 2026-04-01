@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, type MutationFunctionContext } from '@tanstack/react-query'
 import { fetchActiveTasks, archiveTasks, reorderTask, setQueue } from '../api.ts'
 import { useTaskMutations } from '../hooks/useTaskMutations.ts'
 import type { TaskResponse } from '../types.ts'
@@ -24,7 +24,7 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask, onNewBa
   const { completeMutation, reopenMutation } = useTaskMutations()
 
   const { data: tasks, isLoading, error } = useQuery({
-    queryKey: ['tasks', 'active'],
+    queryKey: ['tasks'],
     queryFn: fetchActiveTasks,
   })
 
@@ -58,11 +58,25 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask, onNewBa
     },
   })
 
-  const setQueueMutation = useMutation({
-    mutationFn: ({ id, queue }: { id: string, queue: 'todo' | 'backlog' }) =>
-      setQueue(id, queue),
-    onSuccess: () => {
-      // TODO: the double-tap is causing troubles on re-draw. Update the API?
+  const setQueueAndReorderMutation = useMutation({
+    mutationFn: ({ id, queue, afterId, beforeId }: { id: string, queue: 'todo' | 'backlog', afterId: string | null, beforeId: string | null }) =>
+      Promise.all([setQueue(id, queue), reorderTask(id, afterId, beforeId)]),
+    // onMutate: async ({ id, queue, afterId, beforeId }: { id: string, queue: 'todo' | 'backlog', afterId: string | null, beforeId: string | null }, context:MutationFunctionContext ) => {
+    //   // Cancel any outgoing refetches
+    //   // (so they don't overwrite our optimistic update)
+    //   await context.client.cancelQueries({ queryKey: ['tasks'] })
+    //   const previousTasks = context.client.getQueryData(['tasks']) as Array<TaskResponse>
+
+    //   //optimistically update the task list. Queue is most important, so start there.
+    //   let updatedTask = previousTasks.map(t => t.id === id ? { ...t, queue } : t)
+    //   context.client.setQueryData(['tasks'], updatedTask);
+    //   // return the old value in case we need to roll back in OnError
+    //   return {previousTasks}
+    // },
+    // onError: (_err, _vars, previousTasks) => {
+    //   queryClient.setQueryData(['tasks'], previousTasks);
+    // },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
     },
   })
@@ -91,7 +105,8 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask, onNewBa
       {!isLoading && !error && (
         <div className="flex-1 overflow-y-auto">
           <DragDropProvider
-            onDragEnd={({ operation, canceled }) => {
+            onDragEnd={(event) => {
+              const { operation, canceled } = event;
               if (canceled) return;
               if (!operation.source) return;
 
@@ -134,11 +149,7 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask, onNewBa
                 reordered.splice(toIndex, 0, task);
                 const afterId = reordered[toIndex - 1]?.id ?? null   // task just before
                 const beforeId = reordered[toIndex + 1]?.id ?? null  // task just after
-                setQueueMutation.mutate({ id: task.id, queue: toGroupName as 'todo' | 'backlog' }, {
-                  onSuccess: () => {
-                    reorderMutation.mutate({ id: task.id, afterId, beforeId })
-                  }
-                });
+                setQueueAndReorderMutation.mutate({ id: task.id, queue: toGroupName as 'todo' | 'backlog', afterId, beforeId });
               }
             }}
           >
@@ -162,7 +173,6 @@ export default function TaskListPage({ onLogout, onTaskClick, onNewTask, onNewBa
             >
               + Task
             </button>
-
             <div className="mt-4">
               <SectionDivider label="Backlog" />
               <ul key="backlog">
