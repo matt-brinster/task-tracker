@@ -86,11 +86,11 @@ Phase 6a (frontend scaffolding):
 - `packages/web/src/App.tsx` — placeholder hello world with Tailwind classes
 - `packages/web/src/main.tsx` — React entrypoint, renders `<App />` into `#root`
 - `packages/web/index.html` — HTML shell, loads `main.tsx` as ES module
-- Key deps: `react`, `react-dom`, `tailwindcss`, `@tailwindcss/vite`, `@tanstack/react-query`, `react-router`, `use-debounce`, `vite@7`, `@vitejs/plugin-react@4`
+- Key deps: `react`, `react-dom`, `tailwindcss`, `@tailwindcss/vite`, `@tanstack/react-query`, `react-router`, `use-debounce`, `@dnd-kit/react`, `vite@7`, `@vitejs/plugin-react@4`
 
 Phase 6b (auth):
 - `packages/web/src/auth.ts` — `getToken()`, `setToken()`, `clearToken()` wrapping `localStorage`
-- `packages/web/src/api.ts` — `fetchApi(path, options)` attaches `Bearer` header; on 401, clears token and dispatches `auth:logout` custom event (no page reload). `redeemInvitation(key)` calls `POST /auth/redeem`. `fetchActiveTasks()`, `archiveTasks(taskIds)`, `searchTasks(q)` (calls `GET /tasks/search`), `updateTask(id, { title?, details? })`, plus CRUD task functions.
+- `packages/web/src/api.ts` — `fetchApi(path, options)` attaches `Bearer` header; on 401, clears token and dispatches `auth:logout` custom event (no page reload). `redeemInvitation(key)` calls `POST /auth/redeem`. `fetchActiveTasks()`, `archiveTasks(taskIds)`, `searchTasks(q)` (calls `GET /tasks/search`), `updateTask(id, { title?, details? })`, `reorderTask(id, beforeId, afterId)` (calls `POST /tasks/:id/reorder`), plus CRUD task functions.
 - `packages/web/src/App.tsx` — conditional rendering based on auth state and current view (`list` | `detail` | `search`). Listens for `auth:logout` event to handle expired/invalid tokens gracefully.
 - `packages/web/src/pages/LoginPage.tsx` — invitation key form, calls `redeemInvitation`, stores token on success
 - `packages/web/src/hooks/useTaskMutations.ts` — shared hook returning `completeMutation` and `reopenMutation` (both invalidate `['tasks']` queries on success)
@@ -99,18 +99,18 @@ Phase 6b (auth):
 - `packages/web/src/components/SectionDivider.tsx` — centered label with horizontal lines on each side
 - `packages/web/src/components/Loading.tsx` — centered "Loading..." state
 - `packages/web/src/components/ErrorMessage.tsx` — centered error message with configurable text
-- `packages/web/src/pages/TaskListPage.tsx` — main task list, uses `fetchActiveTasks`. Todo section: actionable tasks (todo queue, not snoozed, not blocked) with `+ Task` button. Backlog section: backlog-queue tasks (same filters) with `+ Backlog` button. Checkbox toggles complete/reopen. Completed tasks in both sections stay visible until archived. Settings section: Search, Archive completed tasks, Logout.
+- `packages/web/src/pages/TaskListPage.tsx` — main task list, uses `fetchActiveTasks`. Todo section: actionable tasks (todo queue, not snoozed, not blocked) with `+ Task` button. Backlog section: backlog-queue tasks (same filters) with `+ Backlog` button. Each section wrapped in its own `DragDropProvider` (from `@dnd-kit/react`) — separate providers enforce within-group reordering only. Each task row rendered as `SortableTaskRow` (uses `useSortable` hook) with a grip handle; `handleOnDragEnd` fires `reorderTask` mutation on drop. Grip is detached during a pending reorder mutation to prevent concurrent reorders. Checkbox toggles complete/reopen. Completed tasks in both sections stay visible until archived. Settings section: Search, Archive completed tasks, Logout.
 - `packages/web/src/pages/TaskDetailPage.tsx` — task detail/edit view. Unified flow for new and existing tasks: title and details are always editable with debounced autosave (`use-debounce`). New tasks created on first non-empty title; subsequent edits PATCHed. Queue toggle (segmented Todo/Backlog radio group) — for new tasks sets queue on create, for existing tasks calls `POST /tasks/:id/queue`. Delete button always visible. No explicit "Create" or "Save" button.
 - `packages/web/src/pages/SearchPage.tsx` — search view. Debounced text input (`use-debounce`, 300ms); empty input shows no results. Results include all non-deleted tasks (archived and completed). Checkbox toggles complete/reopen (reopening also clears `archivedAt`). Clicking a row navigates to task detail. Archived/completed tasks dimmed.
 - `packages/web/src/auth.test.ts` — tests for token helpers (4 tests)
-- `packages/web/src/api.test.ts` — tests for all API functions (23 tests)
+- `packages/web/src/api.test.ts` — tests for all API functions (25 tests)
 - `packages/web/src/App.test.tsx` — tests for auth guard rendering and backlog button (3 tests)
 - `packages/web/src/pages/LoginPage.test.tsx` — tests for login form submission and error display (4 tests)
-- `packages/web/src/pages/TaskListPage.test.tsx` — tests for task list page (18 tests)
+- `packages/web/src/pages/TaskListPage.test.tsx` — tests for task list page (24 tests)
 - `packages/web/src/pages/TaskDetailPage.test.tsx` — tests for task detail page and queue toggle (22 tests)
 - `packages/web/src/pages/SearchPage.test.tsx` — tests for search page (10 tests)
 - `packages/web/vitest.config.ts` — Vitest config with jsdom environment (no react plugin needed — vitest uses esbuild for JSX)
-- `packages/web/src/test-setup.ts` — React Testing Library cleanup between tests
+- `packages/web/src/test-setup.ts` — React Testing Library cleanup between tests; stubs `ResizeObserver` (required by `@dnd-kit/react`, not provided by jsdom)
 
 See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
 
@@ -122,7 +122,7 @@ See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
   - `src/repository/` — persistence
   - `src/routes/` — HTTP layer (Express route handlers, middleware)
   - `src/admin/` — CLI tooling (provisioning)
-- `packages/web/` — the frontend (Phase 6c + search complete): React SPA, Vite 7, TanStack Query, Tailwind CSS v4. No client-side routing — all UI renders at `/`, using conditional rendering based on auth state (`list` | `detail` | `search` views). Mobile-first layout: UI constrained to a narrow centered column (`max-w-md`) on all screen sizes. Working: auth, task list, create/edit, complete/reopen, delete, archive, search, backlog (queue toggle + backlog section). Remaining independent features: blockers, snooze.
+- `packages/web/` — the frontend (Phase 6c + search complete): React SPA, Vite 7, TanStack Query, Tailwind CSS v4. No client-side routing — all UI renders at `/`, using conditional rendering based on auth state (`list` | `detail` | `search` views). Mobile-first layout: UI constrained to a narrow centered column (`max-w-md`) on all screen sizes. Working: auth, task list, create/edit, complete/reopen, delete, archive, search, backlog (queue toggle + backlog section), drag-and-drop reordering (within todo and backlog sections independently). Remaining independent features: blockers, snooze.
 
 There is **no state machine** and no derived "status" field. The domain exposes raw data; the API and UI decide how to present it. Domain predicates may be added as needed (e.g. `isComplete`, `isSnoozed`), but status display logic belongs to the presentation layer.
 
