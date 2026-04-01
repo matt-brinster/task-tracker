@@ -1,10 +1,27 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import TaskListPage from './TaskListPage.tsx'
 import * as api from '../api.ts'
 import type { TaskResponse } from '../types.ts'
+
+// Capture the onDragEnd callback from DragDropProvider so tests can trigger it directly.
+const dnd = vi.hoisted(() => ({
+  onDragEnd: undefined as ((event: any) => void) | undefined,
+}))
+
+vi.mock('@dnd-kit/react', () => ({
+  DragDropProvider: ({ children, onDragEnd }: any) => {
+    dnd.onDragEnd = onDragEnd
+    return children
+  },
+}))
+
+vi.mock('@dnd-kit/react/sortable', () => ({
+  useSortable: () => ({ handleRef: () => {} }),
+  isSortable: () => true,
+}))
 
 function makeTasks(...titles: string[]): TaskResponse[] {
   return titles.map((title, i) => ({
@@ -282,5 +299,116 @@ describe('TaskListPage', () => {
     )
 
     expect(await screen.findByText('Done backlog')).toBeDefined()
+  })
+
+  it('renders a grip icon for each visible task', async () => {
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(makeTasks('Task A', 'Task B'))
+
+    renderWithQuery(
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+    )
+
+    await screen.findByText('Task A')
+    expect(document.querySelectorAll('svg[aria-hidden="true"]').length).toBe(2)
+  })
+
+  it('calls reorderTask when a todo task is dragged to a later position', async () => {
+    const tasks = makeTasks('Task A', 'Task B', 'Task C')
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
+    vi.spyOn(api, 'reorderTask').mockResolvedValue({ ...tasks[0]!, sortOrder: 'a1b' })
+
+    renderWithQuery(
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+    )
+
+    await screen.findByText('Task A')
+
+    // Move task-1 (index 0) to index 2: reordered=[B,C,A], beforeId=null, afterId=task-3
+    act(() => {
+      dnd.onDragEnd!({ canceled: false, operation: { source: { initialIndex: 0, initialGroup: 'todo', index: 2 } } })
+    })
+
+    await waitFor(() => {
+      expect(api.reorderTask).toHaveBeenCalledWith('task-1', null, 'task-3')
+    })
+  })
+
+  it('calls reorderTask when a todo task is dragged to an earlier position', async () => {
+    const tasks = makeTasks('Task A', 'Task B', 'Task C')
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
+    vi.spyOn(api, 'reorderTask').mockResolvedValue({ ...tasks[2]!, sortOrder: 'a-1' })
+
+    renderWithQuery(
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+    )
+
+    await screen.findByText('Task C')
+
+    // Move task-3 (index 2) to index 0: reordered=[C,A,B], beforeId=task-1, afterId=null
+    act(() => {
+      dnd.onDragEnd!({ canceled: false, operation: { source: { initialIndex: 2, initialGroup: 'todo', index: 0 } } })
+    })
+
+    await waitFor(() => {
+      expect(api.reorderTask).toHaveBeenCalledWith('task-3', 'task-1', null)
+    })
+  })
+
+  it('does not call reorderTask when drag is canceled', async () => {
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(makeTasks('Task A', 'Task B'))
+    vi.spyOn(api, 'reorderTask').mockResolvedValue(makeTasks('Task A')[0]!)
+
+    renderWithQuery(
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+    )
+
+    await screen.findByText('Task A')
+
+    act(() => {
+      dnd.onDragEnd!({ canceled: true, operation: { source: { initialIndex: 0, initialGroup: 'todo', index: 1 } } })
+    })
+
+    expect(api.reorderTask).not.toHaveBeenCalled()
+  })
+
+  it('does not call reorderTask when dropped at the same index', async () => {
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(makeTasks('Task A', 'Task B'))
+    vi.spyOn(api, 'reorderTask').mockResolvedValue(makeTasks('Task A')[0]!)
+
+    renderWithQuery(
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+    )
+
+    await screen.findByText('Task A')
+
+    act(() => {
+      dnd.onDragEnd!({ canceled: false, operation: { source: { initialIndex: 1, initialGroup: 'todo', index: 1 } } })
+    })
+
+    expect(api.reorderTask).not.toHaveBeenCalled()
+  })
+
+  it('uses the backlog list when dragging within backlog', async () => {
+    const tasks: TaskResponse[] = [
+      { id: 'b1', title: 'Backlog A', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [], sortOrder: 'a0' },
+      { id: 'b2', title: 'Backlog B', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [], sortOrder: 'a1' },
+    ]
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
+    vi.spyOn(api, 'reorderTask').mockResolvedValue(tasks[0]!)
+
+    renderWithQuery(
+      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+    )
+
+    await screen.findByText('Backlog A')
+
+    // Move b1 (index 0) to index 1: reordered=[b2,b1], beforeId=null, afterId=b2
+    act(() => {
+      dnd.onDragEnd!({ canceled: false, operation: { source: { initialIndex: 0, initialGroup: 'backlog', index: 1 } } })
+    })
+
+    await waitFor(() => {
+      expect(api.reorderTask).toHaveBeenCalledWith('b1', null, 'b2')
+    })
   })
 })

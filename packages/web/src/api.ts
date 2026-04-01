@@ -97,10 +97,10 @@ export async function searchTasks(q: string, limit = 10): Promise<TaskResponse[]
   return response.json() as Promise<TaskResponse[]>
 }
 
-export async function reorderTask(id: string, afterId: string | null, beforeId: string | null): Promise<TaskResponse> {
+export async function reorderTask(id: string, beforeId: string | null, afterId: string | null): Promise<TaskResponse> {
   const response = await fetchApi(`/tasks/${id}/reorder`, {
     method: 'POST',
-    body: JSON.stringify({ afterId, beforeId }),
+    body: JSON.stringify({ beforeId, afterId }),
   })
   return response.json() as Promise<TaskResponse>
 }
