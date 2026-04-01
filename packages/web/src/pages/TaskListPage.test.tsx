@@ -47,7 +47,7 @@ function renderWithQuery(ui: React.ReactElement) {
 }
 
 describe('TaskListPage', () => {
-  const onLogout = vi.fn()
+  const onSettings = vi.fn()
   const onTaskClick = vi.fn()
   const onNewTask = vi.fn()
   const onNewBacklog = vi.fn()
@@ -56,7 +56,7 @@ describe('TaskListPage', () => {
   beforeEach(() => {
     localStorage.clear()
     vi.restoreAllMocks()
-    onLogout.mockReset()
+    onSettings.mockReset()
     onTaskClick.mockReset()
     onNewTask.mockReset()
     onNewBacklog.mockReset()
@@ -67,7 +67,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockReturnValue(new Promise(() => {}))
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     expect(screen.getByText('Loading...')).toBeDefined()
@@ -77,7 +77,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(makeTasks('Buy milk', 'Walk dog'))
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     expect(await screen.findByText('Buy milk')).toBeDefined()
@@ -88,7 +88,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(makeTasks(''))
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     expect(await screen.findByText('(unnamed)')).toBeDefined()
@@ -99,7 +99,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(makeTasks('Buy milk'))
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     const taskTitle = await screen.findByText('Buy milk')
@@ -113,7 +113,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue([])
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     await screen.findByText('+ Task')
@@ -131,7 +131,7 @@ describe('TaskListPage', () => {
     })
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     const checkbox = await screen.findByLabelText('Complete "Buy milk"')
@@ -146,7 +146,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     expect(await screen.findByText('Active task')).toBeDefined()
@@ -159,7 +159,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     expect(await screen.findByText('Active task')).toBeDefined()
@@ -170,7 +170,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockRejectedValue(new Error('Network error'))
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     expect(await screen.findByText('Failed to load tasks.')).toBeDefined()
@@ -180,10 +180,10 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue([])
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
-    expect(await screen.findByText('Search')).toBeDefined()
+    expect(await screen.findByRole('button', { name: 'Search' })).toBeDefined()
   })
 
   it('calls onSearch when Search is clicked', async () => {
@@ -191,27 +191,25 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue([])
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
-    await screen.findByText('Search')
-    await user.click(screen.getByText('Search'))
+    await user.click(await screen.findByRole('button', { name: 'Search' }))
 
     expect(onSearch).toHaveBeenCalled()
   })
 
-  it('calls onLogout and clears token when Logout is clicked', async () => {
+  it('calls onSettings when gear is clicked', async () => {
     const user = userEvent.setup()
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue([])
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
-    await screen.findByText('+ Task')
-    await user.click(screen.getByText('Logout'))
+    await user.click(await screen.findByRole('button', { name: 'Settings' }))
 
-    expect(onLogout).toHaveBeenCalled()
+    expect(onSettings).toHaveBeenCalled()
   })
 
   it('shows backlog tasks under Backlog divider', async () => {
@@ -222,7 +220,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     expect(await screen.findByText('Todo task')).toBeDefined()
@@ -237,7 +235,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     // Backlog task should appear (under backlog section), but not as a todo
@@ -249,7 +247,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue([])
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     await screen.findByText('+ Backlog')
@@ -266,7 +264,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     expect(await screen.findByText('Active backlog')).toBeDefined()
@@ -281,7 +279,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     expect(await screen.findByText('Free backlog')).toBeDefined()
@@ -295,7 +293,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     expect(await screen.findByText('Done backlog')).toBeDefined()
@@ -305,7 +303,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(makeTasks('Task A', 'Task B'))
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     await screen.findByText('Task A')
@@ -318,7 +316,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'reorderTask').mockResolvedValue({ ...tasks[0]!, sortOrder: 'a1b' })
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     await screen.findByText('Task A')
@@ -339,7 +337,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'reorderTask').mockResolvedValue({ ...tasks[2]!, sortOrder: 'a-1' })
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     await screen.findByText('Task C')
@@ -359,7 +357,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'reorderTask').mockResolvedValue(makeTasks('Task A')[0]!)
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     await screen.findByText('Task A')
@@ -376,7 +374,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'reorderTask').mockResolvedValue(makeTasks('Task A')[0]!)
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     await screen.findByText('Task A')
@@ -397,7 +395,7 @@ describe('TaskListPage', () => {
     vi.spyOn(api, 'reorderTask').mockResolvedValue(tasks[0]!)
 
     renderWithQuery(
-      <TaskListPage onLogout={onLogout} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
     )
 
     await screen.findByText('Backlog A')

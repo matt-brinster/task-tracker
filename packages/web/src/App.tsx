@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage.tsx'
 import TaskListPage from './pages/TaskListPage.tsx'
 import TaskDetailPage from './pages/TaskDetailPage.tsx'
 import SearchPage from './pages/SearchPage.tsx'
+import SettingsPage from './pages/SettingsPage.tsx'
 
 import type { Queue } from './types.ts'
 
@@ -11,6 +12,7 @@ type View =
   | { page: 'list' }
   | { page: 'detail'; taskId: string | null; initialQueue?: Queue }
   | { page: 'search' }
+  | { page: 'settings' }
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(() => getToken() !== null)
@@ -37,7 +39,7 @@ function App() {
       <div className="mx-auto max-w-md min-h-screen flex flex-col bg-white">
         {view.page === 'list' && (
           <TaskListPage
-            onLogout={() => setLoggedIn(false)}
+            onSettings={() => setView({ page: 'settings' })}
             onTaskClick={(taskId) => setView({ page: 'detail', taskId })}
             onNewTask={() => setView({ page: 'detail', taskId: null })}
             onNewBacklog={() => setView({ page: 'detail', taskId: null, initialQueue: 'backlog' })}
@@ -55,6 +57,12 @@ function App() {
           <SearchPage
             onBack={() => setView({ page: 'list' })}
             onTaskClick={(taskId) => setView({ page: 'detail', taskId })}
+          />
+        )}
+        {view.page === 'settings' && (
+          <SettingsPage
+            onBack={() => setView({ page: 'list' })}
+            onLogout={() => setLoggedIn(false)}
           />
         )}
       </div>
