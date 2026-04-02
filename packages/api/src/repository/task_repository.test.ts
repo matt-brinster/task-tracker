@@ -3,7 +3,7 @@ import { client } from './client.js'
 import { db } from './client.js'
 import { createTask } from '../domain/task.js'
 import { completeTask, deleteTask, snoozeTask, archiveTask, reorderTask } from '../domain/task_operations.js'
-import { insertTask, updateTask, softDeleteTask, findTaskById, findOpenTasks, findActiveTasks, findMaxSortOrder, findMinSortOrder, searchOpenTasks, searchAllTasks, fromDocument, updateBlockerTitleInAll } from './task_repository.js'
+import { insertTask, updateTask, softDeleteTask, findTaskById, findOpenTasks, findActiveTasks, findMaxSortOrder, findMinSortOrder, searchOpenTasks, searchAllTasks, fromDocument } from './task_repository.js'
 import { ensureIndexes } from './indexes.js'
 import type { TaskDocument } from './task_repository.js'
 
@@ -391,8 +391,8 @@ describe('task repository', () => {
     })
   })
 
-  describe('updateBlockerTitleInAll', () => {
-    it('updates the blocker title in all tasks that reference it', async () => {
+  describe('updateTask — blocker title fan-out', () => {
+    it('propagates title change to all tasks that reference it as a blocker', async () => {
       const blocker = createTask('user-1', 'Old title')
       const task1 = createTask('user-1', 'Task one', { blockers: [{ id: blocker.id, title: 'Old title' }] })
       const task2 = createTask('user-1', 'Task two', { blockers: [{ id: blocker.id, title: 'Old title' }] })
@@ -400,7 +400,8 @@ describe('task repository', () => {
       await insertTask(task1)
       await insertTask(task2)
 
-      await updateBlockerTitleInAll('user-1', blocker.id, 'New title')
+      const updated = { ...blocker, title: 'New title' }
+      await updateTask(blocker, updated)
 
       const found1 = await findTaskById('user-1', task1.id)
       const found2 = await findTaskById('user-1', task2.id)
@@ -421,43 +422,52 @@ describe('task repository', () => {
       await insertTask(blocker2)
       await insertTask(task)
 
-      await updateBlockerTitleInAll('user-1', blocker1.id, 'Updated')
+      const updated = { ...blocker1, title: 'Updated' }
+      await updateTask(blocker1, updated)
 
       const found = await findTaskById('user-1', task.id)
       expect(found!.blockers[0]!.title).toBe('Updated')
       expect(found!.blockers[1]!.title).toBe('Blocker two')
     })
 
-    it('does not update tasks belonging to another user', async () => {
-      const blocker = createTask('user-1', 'Shared blocker id')
+    it('does not propagate to tasks belonging to another user', async () => {
+      const blocker = createTask('user-1', 'Old title')
       const otherTask = createTask('user-2', 'Other user task', { blockers: [{ id: blocker.id, title: 'Old title' }] })
       await insertTask(blocker)
       await insertTask(otherTask)
 
-      await updateBlockerTitleInAll('user-1', blocker.id, 'New title')
+      const updated = { ...blocker, title: 'New title' }
+      await updateTask(blocker, updated)
 
       const found = await findTaskById('user-2', otherTask.id)
       expect(found!.blockers[0]!.title).toBe('Old title')
     })
 
-    it('does not update soft-deleted tasks', async () => {
+    it('does not propagate to soft-deleted tasks', async () => {
       const blocker = createTask('user-1', 'Old title')
       const task = createTask('user-1', 'Doomed task', { blockers: [{ id: blocker.id, title: 'Old title' }] })
       await insertTask(blocker)
       await insertTask(task)
       await softDeleteTask(task, deleteTask(task, new Date()))
 
-      await updateBlockerTitleInAll('user-1', blocker.id, 'New title')
+      const updated = { ...blocker, title: 'New title' }
+      await updateTask(blocker, updated)
 
       const doc = await db().collection<TaskDocument>('tasks').findOne({ _id: task.id })
       expect(doc!.blockers[0]!.title).toBe('Old title')
     })
 
-    it('is a no-op when no tasks reference the blocker', async () => {
-      const task = createTask('user-1', 'Unrelated task')
+    it('skips fan-out when title is unchanged', async () => {
+      const blocker = createTask('user-1', 'Same title')
+      const task = createTask('user-1', 'Dependent', { blockers: [{ id: blocker.id, title: 'Same title' }] })
+      await insertTask(blocker)
       await insertTask(task)
 
-      await expect(updateBlockerTitleInAll('user-1', 'nonexistent-id', 'New title')).resolves.toBeUndefined()
+      const updated = { ...blocker, details: 'some details' }
+      await updateTask(blocker, updated)
+
+      const found = await findTaskById('user-1', task.id)
+      expect(found!.blockers[0]!.title).toBe('Same title')
     })
   })
 

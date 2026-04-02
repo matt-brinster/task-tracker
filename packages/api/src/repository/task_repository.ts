@@ -116,7 +116,7 @@ export async function removeBlockerFromAll(userId: string, blockerId: string): P
   )
 }
 
-export async function updateBlockerTitleInAll(userId: string, blockerId: string, newTitle: string): Promise<void> {
+async function updateBlockerTitleInAll(userId: string, blockerId: string, newTitle: string): Promise<void> {
   await collection().updateMany(
     { userId, deletedAt: null, 'blockers.id': blockerId },
     { $set: { 'blockers.$[elem].title': newTitle } },
