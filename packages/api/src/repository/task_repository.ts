@@ -60,11 +60,15 @@ export async function insertTask(task: Task): Promise<void> {
   await collection().insertOne(toDocument(task))
 }
 
-export async function updateTask(_old: Task, updated: Task): Promise<void> {
+export async function updateTask(old: Task, updated: Task): Promise<void> {
   if (updated.deletedAt !== null) {
     throw new Error('updateTask cannot soft-delete a task — use softDeleteTask instead')
   }
   await collection().replaceOne({ _id: updated.id }, toDocument(updated))
+  // Inline fan-out: if title changed, propagate to all denormalized blocker references.
+  if (updated.title !== old.title) {
+    await updateBlockerTitleInAll(updated.userId, updated.id, updated.title)
+  }
 }
 
 export async function softDeleteTask(old: Task, deleted: Task): Promise<void> {

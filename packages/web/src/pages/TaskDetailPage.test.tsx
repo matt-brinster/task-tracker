@@ -210,7 +210,6 @@ describe('TaskDetailPage — blockers section', () => {
 
   it('shows Blockers section for existing tasks', async () => {
     vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
-    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
 
     renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
 

@@ -3,7 +3,7 @@ import { generateKeyBetween } from 'fractional-indexing'
 import type { Task, Queue, CreateTaskOptions } from '../domain/task.js'
 import { createTask } from '../domain/task.js'
 import { completeTask, reopenTask, snoozeTask, wakeTask, deleteTask, setQueue, addBlockers, removeBlockers, reorderTask } from '../domain/task_operations.js'
-import { findOpenTasks, findActiveTasks, findTaskById, insertTask, updateTask, softDeleteTask, searchOpenTasks, searchAllTasks, archiveTasks, findMaxSortOrder, findMinSortOrder, updateBlockerTitleInAll } from '../repository/task_repository.js'
+import { findOpenTasks, findActiveTasks, findTaskById, insertTask, updateTask, softDeleteTask, searchOpenTasks, searchAllTasks, archiveTasks, findMaxSortOrder, findMinSortOrder } from '../repository/task_repository.js'
 
 function toTaskResponse(task: Task) {
   return {
@@ -134,9 +134,6 @@ taskRouter.patch('/:id', async (req, res) => {
     ...(details !== undefined ? { details } : {}),
   }
   await updateTask(task, updated)
-  if (title !== undefined && title !== task.title) {
-    await updateBlockerTitleInAll(req.userId, task.id, title)
-  }
   res.json(toTaskResponse(updated))
 })
 
@@ -235,6 +232,10 @@ taskRouter.post('/:id/blockers', async (req, res) => {
   const { id } = req.body
   if (typeof id !== 'string' || id.trim() === '') {
     res.status(400).json({ error: 'id is required' })
+    return
+  }
+  if (id === task.id) {
+    res.status(400).json({ error: 'A task cannot block itself' })
     return
   }
 

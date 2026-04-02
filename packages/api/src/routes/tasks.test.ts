@@ -1289,6 +1289,19 @@ describe('POST /tasks/:id/blockers', () => {
 
     expect(res.status).toBe(404)
   })
+
+  it('returns 400 when trying to add a task as its own blocker', async () => {
+    const task = createTask('user-1', 'Buy milk')
+    await insertTask(task)
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/blockers`)
+      .set(...auth(token1))
+      .send({ id: task.id })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/cannot block itself/)
+  })
 })
 
 describe('POST /tasks/:id/blockers/remove', () => {

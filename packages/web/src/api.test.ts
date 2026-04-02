@@ -259,19 +259,14 @@ describe('fetchTask', () => {
     expect(url).toBe('/api/tasks/task-1')
   })
 
-  it('throws ApiError on 404', async () => {
+  it('returns null on 404', async () => {
     setToken('test-token')
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ error: 'Task not found' }), { status: 404 })
     )
 
-    try {
-      await fetchTask('nonexistent')
-      expect.fail('should have thrown')
-    } catch (err) {
-      expect(err).toBeInstanceOf(ApiError)
-      expect((err as ApiError).status).toBe(404)
-    }
+    const result = await fetchTask('nonexistent')
+    expect(result).toBeNull()
   })
 })
 
