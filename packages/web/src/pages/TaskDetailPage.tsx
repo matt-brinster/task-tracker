@@ -5,6 +5,7 @@ import { fetchTask, updateTask, deleteTask, createTask, setQueue as setQueueApi,
 import type { Queue, TaskResponse } from '../types.ts'
 import { useTaskMutations, invalidateTaskQueries } from '../hooks/useTaskMutations.ts'
 import BackButton from '../components/BackButton.tsx'
+import SectionDivider from '../components/SectionDivider.tsx'
 import ParentBackButton from '../components/ParentBackButton.tsx'
 import Checkbox from '../components/Checkbox.tsx'
 import BlockersSection from '../components/BlockersSection.tsx'
@@ -155,7 +156,7 @@ function TaskForm({
   const detailsRef = useRef(details)
   const queueRef = useRef(queue)
 
-  const { completeMutation, reopenMutation } = useTaskMutations()
+  const { completeMutation, reopenMutation, snoozeMutation, wakeMutation } = useTaskMutations()
 
   const deleteMutation = useMutation({
     mutationFn: deleteTask,
@@ -284,6 +285,15 @@ function TaskForm({
         <QueueToggle queue={queue} onToggle={handleQueueToggle} />
       </div>
 
+      {task && taskId && (
+        <SnoozeSection
+          task={task}
+          onSnooze={() => snoozeMutation.mutate({ id: taskId, until: new Date(Date.now() + 60 * 60 * 1000) })}
+          onWake={() => wakeMutation.mutate(taskId)}
+          isPending={snoozeMutation.isPending || wakeMutation.isPending}
+        />
+      )}
+
       {saveError && (
         <div className="px-4">
           <p className="text-red-600 text-sm">{saveError}</p>
@@ -348,6 +358,58 @@ function DetailShell({ onBack, onDelete, onParentBack, children }: {
         )}
       </header>
       {children}
+    </div>
+  )
+}
+
+function isSnoozed(task: TaskResponse): boolean {
+  if (!task.snoozedUntil) return false
+  return new Date(task.snoozedUntil) > new Date()
+}
+
+function formatSnoozeDate(iso: string): string {
+  const date = new Date(iso)
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function SnoozeSection({ task, onSnooze, onWake, isPending }: {
+  task: TaskResponse
+  onSnooze: () => void
+  onWake: () => void
+  isPending: boolean
+}) {
+  const snoozed = isSnoozed(task)
+
+  return (
+    <div className="mt-2">
+      <SectionDivider label="Snooze" />
+      <div className="flex flex-col items-center gap-2 py-2">
+        {snoozed ? (
+          <>
+            <span className="text-sm text-gray-600">{formatSnoozeDate(task.snoozedUntil!)}</span>
+            <button
+              onClick={onWake}
+              disabled={isPending}
+              className="px-4 py-1 text-sm text-blue-600 bg-blue-50 rounded-full hover:bg-blue-100 disabled:opacity-50"
+            >
+              Clear Snooze
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={onSnooze}
+            disabled={isPending}
+            className="px-4 py-1 text-sm text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 disabled:opacity-50"
+          >
+            1 Hour
+          </button>
+        )}
+      </div>
     </div>
   )
 }

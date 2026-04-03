@@ -139,6 +139,19 @@ export async function removeBlocker(taskId: string, blockerId: string): Promise<
   return response.json() as Promise<TaskResponse>
 }
 
+export async function snoozeTask(id: string, until: Date): Promise<TaskResponse> {
+  const response = await fetchApi(`/tasks/${id}/snooze`, {
+    method: 'POST',
+    body: JSON.stringify({ until: until.toISOString() }),
+  })
+  return response.json() as Promise<TaskResponse>
+}
+
+export async function wakeTask(id: string): Promise<TaskResponse> {
+  const response = await fetchApi(`/tasks/${id}/wake`, { method: 'POST' })
+  return response.json() as Promise<TaskResponse>
+}
+
 export async function redeemInvitation(key: string): Promise<string> {
   const response = await fetch('/api/auth/redeem', {
     method: 'POST',

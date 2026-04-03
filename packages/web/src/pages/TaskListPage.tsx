@@ -70,6 +70,10 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
     .filter(t => t.queue === 'todo' && (t.completedAt !== null || !isBlockedByOpenTask(t, openTaskIds)) && !isSnoozed(t))
     .sort((a, b) => a.sortOrder < b.sortOrder ? -1 : 1)
 
+  const snoozedTasks = (tasks ?? [])
+    .filter(t => isSnoozed(t))
+    .sort((a, b) => a.sortOrder < b.sortOrder ? -1 : 1)
+
   const blockedTasks = (tasks ?? [])
     .filter(t => isBlockedByOpenTask(t, openTaskIds) && !t.completedAt && !isSnoozed(t))
     .sort((a, b) => a.sortOrder < b.sortOrder ? -1 : 1)
@@ -169,6 +173,23 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
               <SectionDivider label="Blocked" />
               <ul>
                 {blockedTasks.map(task => (
+                  <li key={task.id} className="flex items-start">
+                    <CheckboxRow
+                      title={task.title}
+                      completedAt={task.completedAt}
+                      onCheck={() => handleCheckbox(task)}
+                      onClick={() => onTaskClick(task.id)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {snoozedTasks.length > 0 && (
+            <div className="mt-4">
+              <SectionDivider label="Snoozed" />
+              <ul>
+                {snoozedTasks.map(task => (
                   <li key={task.id} className="flex items-start">
                     <CheckboxRow
                       title={task.title}

@@ -467,6 +467,91 @@ describe('TaskDetailPage — internal navigation stack', () => {
   })
 })
 
+describe('TaskDetailPage — snooze section', () => {
+  const onBack = vi.fn()
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    onBack.mockReset()
+  })
+
+  it('shows Snooze section for existing tasks', async () => {
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    expect(await screen.findByTestId('divider-Snooze')).toBeDefined()
+  })
+
+  it('does not show Snooze section for new tasks', () => {
+    renderWithQuery(<TaskDetailPage taskId={null} onBack={onBack} />)
+
+    expect(screen.queryByTestId('divider-Snooze')).toBeNull()
+  })
+
+  it('shows 1 Hour button when task is not snoozed', async () => {
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    expect(await screen.findByText('1 Hour')).toBeDefined()
+  })
+
+  it('calls snoozeTask when 1 Hour button is clicked', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
+    vi.spyOn(api, 'snoozeTask').mockResolvedValue(
+      makeTask({ snoozedUntil: new Date(Date.now() + 3600000).toISOString() })
+    )
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    await user.click(await screen.findByText('1 Hour'))
+
+    expect(api.snoozeTask).toHaveBeenCalledTimes(1)
+    const [id, until] = vi.mocked(api.snoozeTask).mock.calls[0]!
+    expect(id).toBe('task-1')
+    // Should be approximately 1 hour from now
+    expect(until.getTime()).toBeGreaterThan(Date.now() + 3500000)
+    expect(until.getTime()).toBeLessThan(Date.now() + 3700000)
+  })
+
+  it('shows Clear Snooze button and datetime when task is snoozed', async () => {
+    const futureDate = new Date(Date.now() + 86400000).toISOString()
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask({ snoozedUntil: futureDate }))
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    expect(await screen.findByText('Clear Snooze')).toBeDefined()
+    expect(screen.queryByText('1 Hour')).toBeNull()
+  })
+
+  it('calls wakeTask when Clear Snooze is clicked', async () => {
+    const user = userEvent.setup()
+    const futureDate = new Date(Date.now() + 86400000).toISOString()
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask({ snoozedUntil: futureDate }))
+    vi.spyOn(api, 'wakeTask').mockResolvedValue(makeTask({ snoozedUntil: null }))
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    await user.click(await screen.findByText('Clear Snooze'))
+
+    expect(api.wakeTask).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(api.wakeTask).mock.calls[0]![0]).toBe('task-1')
+  })
+
+  it('does not show Clear Snooze for an expired snooze', async () => {
+    const pastDate = new Date(Date.now() - 86400000).toISOString()
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask({ snoozedUntil: pastDate }))
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    // Expired snooze should show 1 Hour button, not Clear Snooze
+    expect(await screen.findByText('1 Hour')).toBeDefined()
+    expect(screen.queryByText('Clear Snooze')).toBeNull()
+  })
+})
+
 describe('TaskDetailPage — queue toggle', () => {
   const onBack = vi.fn()
 

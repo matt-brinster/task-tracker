@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { completeTask, reopenTask } from '../api.ts'
+import { completeTask, reopenTask, snoozeTask, wakeTask } from '../api.ts'
 
 /** Invalidate both the task list and all individual task caches. */
 export function invalidateTaskQueries(queryClient: QueryClient) {
@@ -21,5 +21,15 @@ export function useTaskMutations() {
     onSuccess: () => { invalidateTaskQueries(queryClient) },
   })
 
-  return { completeMutation, reopenMutation }
+  const snoozeMutation = useMutation({
+    mutationFn: ({ id, until }: { id: string; until: Date }) => snoozeTask(id, until),
+    onSuccess: () => { invalidateTaskQueries(queryClient) },
+  })
+
+  const wakeMutation = useMutation({
+    mutationFn: wakeTask,
+    onSuccess: () => { invalidateTaskQueries(queryClient) },
+  })
+
+  return { completeMutation, reopenMutation, snoozeMutation, wakeMutation }
 }
