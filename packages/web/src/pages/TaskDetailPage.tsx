@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDebouncedCallback } from 'use-debounce'
 import { fetchTask, updateTask, deleteTask, createTask, setQueue as setQueueApi, addBlocker } from '../api.ts'
 import type { Queue, TaskResponse } from '../types.ts'
-import { useTaskMutations } from '../hooks/useTaskMutations.ts'
+import { useTaskMutations, invalidateTaskQueries } from '../hooks/useTaskMutations.ts'
 import BackButton from '../components/BackButton.tsx'
 import ParentBackButton from '../components/ParentBackButton.tsx'
 import Checkbox from '../components/Checkbox.tsx'
@@ -160,7 +160,7 @@ function TaskForm({
   const deleteMutation = useMutation({
     mutationFn: deleteTask,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      invalidateTaskQueries(queryClient)
       onBack()
     },
   })
@@ -168,13 +168,13 @@ function TaskForm({
   const queueMutation = useMutation({
     mutationFn: (newQueue: Queue) => setQueueApi(taskId!, newQueue),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      invalidateTaskQueries(queryClient)
     },
   })
 
   function patchTask(id: string, patchTitle: string, patchDetails: string) {
     return updateTask(id, { title: patchTitle, details: patchDetails })
-      .then(() => queryClient.invalidateQueries({ queryKey: ['tasks'] }))
+      .then(() => invalidateTaskQueries(queryClient))
       .catch(() => setSaveError('Failed to save changes.'))
   }
 
@@ -189,11 +189,11 @@ function TaskForm({
           .then(async (created) => {
             createPendingRef.current = false
             setCreatedId(created.id)
-            queryClient.invalidateQueries({ queryKey: ['tasks'] })
+            invalidateTaskQueries(queryClient)
             if (pendingBlockerFor) {
               try {
                 await addBlocker(pendingBlockerFor, created.id)
-                queryClient.invalidateQueries({ queryKey: ['tasks'] })
+                invalidateTaskQueries(queryClient)
               } catch {
                 // blocker link failed silently — task was still created
               }

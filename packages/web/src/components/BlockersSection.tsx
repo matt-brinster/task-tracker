@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDebouncedCallback } from 'use-debounce'
-import { fetchOpenTasks, addBlocker, removeBlocker, searchOpenTasks } from '../api.ts'
+import { fetchOpenTasks, fetchTask, addBlocker, removeBlocker, searchOpenTasks } from '../api.ts'
 import type { Queue, TaskResponse, Blocker } from '../types.ts'
-import { useTaskMutations } from '../hooks/useTaskMutations.ts'
+import { useTaskMutations, invalidateTaskQueries } from '../hooks/useTaskMutations.ts'
 import BackButton from './BackButton.tsx'
 import CheckboxRow from './CheckboxRow.tsx'
 import SectionDivider from './SectionDivider.tsx'
@@ -22,13 +22,14 @@ function SmallXIcon() {
 }
 
 function BlockerRow({ blocker, onRemove, onTaskClick }: { blocker: Blocker; onRemove: () => void; onTaskClick?: (taskId: string) => void }) {
-  const queryClient = useQueryClient()
   const { completeMutation, reopenMutation } = useTaskMutations()
 
-  const cachedTasks = queryClient.getQueryData<TaskResponse[]>(['tasks'])
-  const blockerTask = cachedTasks?.find(t => t.id === blocker.id)
-  // If not in the active cache, the blocker is archived/completed — treat as done
-  const completedAt = blockerTask ? blockerTask.completedAt : '1970-01-01T00:00:00.000Z'
+  const { data: blockerTask } = useQuery({
+    queryKey: ['task', blocker.id],
+    queryFn: () => fetchTask(blocker.id),
+  })
+
+  const completedAt = blockerTask?.completedAt ?? null
   const isCompleted = completedAt !== null
 
   return (
@@ -73,13 +74,13 @@ export default function BlockersSection({ taskId, blockers, queue, onTaskClick, 
 
   const removeMutation = useMutation({
     mutationFn: (blockerId: string) => removeBlocker(taskId, blockerId),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tasks'] }) },
+    onSuccess: () => { invalidateTaskQueries(queryClient) },
   })
 
   const addMutation = useMutation({
     mutationFn: (blockerId: string) => addBlocker(taskId, blockerId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      invalidateTaskQueries(queryClient)
       closeSearch()
     },
   })
@@ -147,7 +148,7 @@ export default function BlockersSection({ taskId, blockers, queue, onTaskClick, 
           </ul>
           <button
             onClick={() => { closeSearch(); onNewTask?.({ pendingBlockerFor: taskId, queue }) }}
-            className="w-full py-3 text-center text-gray-500 hover:text-gray-700"
+            className="w-full py-3 text-sm text-center text-gray-500 hover:text-gray-700"
           >
             + New blocker
           </button>

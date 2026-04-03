@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchActiveTasks, archiveTasks, reorderTask } from '../api.ts'
-import { useTaskMutations } from '../hooks/useTaskMutations.ts'
+import { useTaskMutations, invalidateTaskQueries } from '../hooks/useTaskMutations.ts'
 import type { TaskResponse } from '../types.ts'
 import CheckboxRow from '../components/CheckboxRow.tsx'
 import SectionDivider from '../components/SectionDivider.tsx'
@@ -30,7 +30,7 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
   const archiveMutation = useMutation({
     mutationFn: archiveTasks,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      invalidateTaskQueries(queryClient)
     },
   })
 
@@ -53,7 +53,7 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
     mutationFn: ({ id, beforeId, afterId }: { id: string, beforeId: string | null, afterId: string | null }) =>
       reorderTask(id, beforeId, afterId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      invalidateTaskQueries(queryClient)
     },
   })
 
