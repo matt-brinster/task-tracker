@@ -3,7 +3,7 @@ import {
   fetchApi, redeemInvitation, ApiError,
   fetchOpenTasks, fetchActiveTasks, archiveTasks, searchTasks, searchOpenTasks,
   createTask, fetchTask, updateTask, completeTask, reopenTask, deleteTask,
-  setQueue, reorderTask, addBlocker, removeBlocker,
+  setQueue, reorderTask, addBlocker, removeBlocker, snoozeTask, wakeTask,
 } from './api.ts'
 import { setToken, getToken } from './auth.ts'
 
@@ -488,6 +488,51 @@ describe('removeBlocker', () => {
     expect(url).toBe('/api/tasks/task-1/blockers/remove')
     expect(options!.method).toBe('POST')
     expect(JSON.parse(options!.body as string)).toEqual({ id: 'blocker-1' })
+  })
+})
+
+describe('snoozeTask', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls POST /tasks/:id/snooze with until ISO string and returns updated task', async () => {
+    setToken('test-token')
+    const until = new Date('2026-04-03T15:00:00.000Z')
+    const snoozed = { ...sampleTask, snoozedUntil: until.toISOString() }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(snoozed), { status: 200 })
+    )
+
+    const task = await snoozeTask('task-1', until)
+
+    expect(task.snoozedUntil).toBe('2026-04-03T15:00:00.000Z')
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/task-1/snooze')
+    expect(options!.method).toBe('POST')
+    expect(JSON.parse(options!.body as string)).toEqual({ until: '2026-04-03T15:00:00.000Z' })
+  })
+})
+
+describe('wakeTask', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls POST /tasks/:id/wake and returns updated task', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(sampleTask), { status: 200 })
+    )
+
+    const task = await wakeTask('task-1')
+
+    expect(task.snoozedUntil).toBeNull()
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/tasks/task-1/wake')
+    expect(options!.method).toBe('POST')
   })
 })
 

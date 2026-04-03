@@ -140,7 +140,7 @@ describe('TaskListPage', () => {
     expect(vi.mocked(api.completeTask).mock.calls[0]![0]).toBe('task-1')
   })
 
-  it('filters out snoozed tasks', async () => {
+  it('shows snoozed tasks in the Snoozed section instead of todo', async () => {
     const tasks = makeTasks('Active task', 'Snoozed task')
     tasks[1]!.snoozedUntil = new Date(Date.now() + 86400000).toISOString()
     vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
@@ -150,7 +150,20 @@ describe('TaskListPage', () => {
     )
 
     expect(await screen.findByText('Active task')).toBeDefined()
-    expect(screen.queryByText('Snoozed task')).toBeNull()
+    expect(screen.getByText('Snoozed task')).toBeDefined()
+    expect(screen.getByText('Snoozed')).toBeDefined() // section divider
+  })
+
+  it('hides the Snoozed section when no tasks are snoozed', async () => {
+    const tasks = makeTasks('Active task')
+    vi.spyOn(api, 'fetchActiveTasks').mockResolvedValue(tasks)
+
+    renderWithQuery(
+      <TaskListPage onSettings={onSettings} onTaskClick={onTaskClick} onNewTask={onNewTask} onNewBacklog={onNewBacklog} onSearch={onSearch} />
+    )
+
+    expect(await screen.findByText('Active task')).toBeDefined()
+    expect(screen.queryByText('Snoozed')).toBeNull()
   })
 
   it('moves blocked tasks to the Blocked section (not in todo)', async () => {
@@ -258,7 +271,7 @@ describe('TaskListPage', () => {
     expect(onNewBacklog).toHaveBeenCalled()
   })
 
-  it('filters out snoozed backlog tasks', async () => {
+  it('moves snoozed backlog tasks to the Snoozed section', async () => {
     const tasks: TaskResponse[] = [
       { id: 'backlog-1', title: 'Active backlog', details: '', queue: 'backlog', completedAt: null, snoozedUntil: null, archivedAt: null, blockers: [], sortOrder: 'a0' },
       { id: 'backlog-2', title: 'Snoozed backlog', details: '', queue: 'backlog', completedAt: null, snoozedUntil: new Date(Date.now() + 86400000).toISOString(), archivedAt: null, blockers: [], sortOrder: 'a1' },
@@ -270,7 +283,8 @@ describe('TaskListPage', () => {
     )
 
     expect(await screen.findByText('Active backlog')).toBeDefined()
-    expect(screen.queryByText('Snoozed backlog')).toBeNull()
+    expect(screen.getByText('Snoozed backlog')).toBeDefined()
+    expect(screen.getByText('Snoozed')).toBeDefined() // section divider
   })
 
   it('moves blocked backlog tasks to the Blocked section (not in backlog)', async () => {
