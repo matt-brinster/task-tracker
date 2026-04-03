@@ -226,22 +226,22 @@ function TaskForm({ initialTitle, initialDetails, task, initialQueue, onBack, on
 }
 
 function BlockerRow({ blocker, onRemove, onTaskClick }: { blocker: Blocker; onRemove: () => void; onTaskClick?: (taskId: string) => void }) {
+  const queryClient = useQueryClient()
   const { completeMutation, reopenMutation } = useTaskMutations()
-  const { data: blockerTask } = useQuery({
-    queryKey: ['tasks', blocker.id],
-    queryFn: () => fetchTask(blocker.id),
-  })
 
-  const isCompleted = !!blockerTask?.completedAt
+  const cachedTasks = queryClient.getQueryData<TaskResponse[]>(['tasks'])
+  const blockerTask = cachedTasks?.find(t => t.id === blocker.id)
+  // If not in the active cache, the blocker is archived/completed — treat as done
+  const completedAt = blockerTask ? blockerTask.completedAt : '1970-01-01T00:00:00.000Z'
+  const isCompleted = completedAt !== null
 
   return (
     <li className="flex items-start">
       <CheckboxRow
         title={blocker.title}
-        completedAt={blockerTask?.completedAt ?? null}
+        completedAt={completedAt}
         onCheck={() => isCompleted ? reopenMutation.mutate(blocker.id) : completeMutation.mutate(blocker.id)}
         onClick={() => onTaskClick?.(blocker.id)}
-        disabled={!blockerTask}
       />
       <button
         onClick={onRemove}

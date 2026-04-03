@@ -26,12 +26,20 @@ function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
   }
 }
 
-function renderWithQuery(ui: React.ReactElement) {
+function createQueryClient(initialTasks?: TaskResponse[]) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
+  if (initialTasks) {
+    queryClient.setQueryData(['tasks'], initialTasks)
+  }
+  return queryClient
+}
+
+function renderWithQuery(ui: React.ReactElement, queryClient?: QueryClient) {
+  const qc = queryClient ?? createQueryClient()
   return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    <QueryClientProvider client={qc}>{ui}</QueryClientProvider>
   )
 }
 
@@ -304,6 +312,35 @@ describe('TaskDetailPage — blockers section', () => {
     renderWithQuery(<TaskDetailPage taskId={null} onBack={onBack} />)
 
     expect(screen.queryByTestId('divider-Blockers')).toBeNull()
+  })
+
+  it('shows blocker as incomplete when found in active tasks cache', async () => {
+    const blockerInCache = makeTask({ id: 'blocker-1', title: 'Fix the bug', completedAt: null })
+    const qc = createQueryClient([blockerInCache])
+
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(
+      makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
+    )
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
+
+    // Verify blocker title appears, then check the checkbox state
+    await screen.findByText('Fix the bug')
+    // Blocker is in cache with completedAt: null → shows as incomplete
+    expect(screen.getByLabelText('Complete "Fix the bug"')).toBeDefined()
+  })
+
+  it('shows blocker as completed when not in active tasks cache', async () => {
+    const qc = createQueryClient([]) // empty cache — blocker not present
+
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(
+      makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
+    )
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
+
+    // Blocker not in cache → assumed completed (archived/deleted)
+    expect(await screen.findByLabelText('Reopen "Fix the bug"')).toBeDefined()
   })
 })
 

@@ -5,10 +5,9 @@ type Props = {
   completedAt: string | null
   onCheck: () => void
   onClick: () => void
-  disabled?: boolean
 }
 
-export default function CheckboxRow({ title, completedAt, onCheck, onClick, disabled = false }: Props) {
+export default function CheckboxRow({ title, completedAt, onCheck, onClick }: Props) {
   const completed = completedAt !== null
   const displayTitle = title || '(unnamed)'
   return (
@@ -18,7 +17,6 @@ export default function CheckboxRow({ title, completedAt, onCheck, onClick, disa
           checked={completed}
           onClick={onCheck}
           displayTitle={displayTitle}
-          disabled={disabled}
         />
       </div>
       <button
