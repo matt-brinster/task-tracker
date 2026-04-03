@@ -344,6 +344,122 @@ describe('TaskDetailPage — blockers section', () => {
   })
 })
 
+describe('TaskDetailPage — internal navigation stack', () => {
+  const onBack = vi.fn()
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    onBack.mockReset()
+  })
+
+  it('does not show parent back button when there is no stack history', async () => {
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    await screen.findByDisplayValue('Buy milk')
+    expect(screen.queryByLabelText('Back to parent task')).toBeNull()
+  })
+
+  it('navigates to blocker task when blocker row is clicked', async () => {
+    const user = userEvent.setup()
+    const blockerTask = makeTask({ id: 'blocker-1', title: 'Fix the bug', blockers: [] })
+    const parentTask = makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
+    const qc = createQueryClient([blockerTask, parentTask])
+
+    vi.spyOn(api, 'fetchTask')
+      .mockResolvedValueOnce(parentTask)
+      .mockResolvedValueOnce(blockerTask)
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
+
+    // Click the blocker row text to navigate to it
+    await user.click(await screen.findByText('Fix the bug'))
+
+    // Should now show the blocker task's title
+    expect(await screen.findByDisplayValue('Fix the bug')).toBeDefined()
+  })
+
+  it('shows parent back button after navigating to a blocker', async () => {
+    const user = userEvent.setup()
+    const blockerTask = makeTask({ id: 'blocker-1', title: 'Fix the bug', blockers: [] })
+    const parentTask = makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
+    const qc = createQueryClient([blockerTask, parentTask])
+
+    vi.spyOn(api, 'fetchTask')
+      .mockResolvedValueOnce(parentTask)
+      .mockResolvedValueOnce(blockerTask)
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
+
+    await user.click(await screen.findByText('Fix the bug'))
+    await screen.findByDisplayValue('Fix the bug')
+
+    expect(screen.getByLabelText('Back to parent task')).toBeDefined()
+  })
+
+  it('parent back button returns to the previous task', async () => {
+    const user = userEvent.setup()
+    const blockerTask = makeTask({ id: 'blocker-1', title: 'Fix the bug', blockers: [] })
+    const parentTask = makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
+    const qc = createQueryClient([blockerTask, parentTask])
+
+    vi.spyOn(api, 'fetchTask')
+      .mockResolvedValueOnce(parentTask)
+      .mockResolvedValueOnce(blockerTask)
+      .mockResolvedValueOnce(parentTask)
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
+
+    await user.click(await screen.findByText('Fix the bug'))
+    await screen.findByDisplayValue('Fix the bug')
+
+    await user.click(screen.getByLabelText('Back to parent task'))
+
+    // Should be back on the parent task
+    expect(await screen.findByDisplayValue('Buy milk')).toBeDefined()
+    // Parent back button should be gone (stack is empty)
+    expect(screen.queryByLabelText('Back to parent task')).toBeNull()
+  })
+
+  it('list back button always calls onBack regardless of stack depth', async () => {
+    const user = userEvent.setup()
+    const blockerTask = makeTask({ id: 'blocker-1', title: 'Fix the bug', blockers: [] })
+    const parentTask = makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
+    const qc = createQueryClient([blockerTask, parentTask])
+
+    vi.spyOn(api, 'fetchTask')
+      .mockResolvedValueOnce(parentTask)
+      .mockResolvedValueOnce(blockerTask)
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
+
+    await user.click(await screen.findByText('Fix the bug'))
+    await screen.findByDisplayValue('Fix the bug')
+
+    // Click the list back button (^), not the parent back button (<)
+    await user.click(screen.getByLabelText('Back'))
+
+    expect(onBack).toHaveBeenCalled()
+  })
+
+  it('navigating to new blocker shows empty form with parent back button', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
+    vi.spyOn(api, 'fetchOpenTasks').mockResolvedValue([])
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    await user.click(await screen.findByText('+ Blocker'))
+    await user.click(await screen.findByText('+ New blocker'))
+
+    // Should show an empty task form
+    expect(screen.getByPlaceholderText('Task name')).toBeDefined()
+    // Should have parent back button
+    expect(screen.getByLabelText('Back to parent task')).toBeDefined()
+  })
+})
+
 describe('TaskDetailPage — queue toggle', () => {
   const onBack = vi.fn()
 

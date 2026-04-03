@@ -5,47 +5,82 @@ import { fetchTask, fetchOpenTasks, updateTask, deleteTask, createTask, setQueue
 import type { Queue, TaskResponse, Blocker } from '../types.ts'
 import { useTaskMutations } from '../hooks/useTaskMutations.ts'
 import BackButton from '../components/BackButton.tsx'
+import ParentBackButton from '../components/ParentBackButton.tsx'
 import Checkbox from '../components/Checkbox.tsx'
 import CheckboxRow from '../components/CheckboxRow.tsx'
 import SectionDivider from '../components/SectionDivider.tsx'
 import Loading from '../components/Loading.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
 
+const MAX_STACK_DEPTH = 10
+
+type StackEntry = {
+  taskId: string | null
+  initialQueue?: Queue
+  pendingBlockerFor?: string
+}
+
 type TaskDetailPageProps = {
   taskId: string | null  // null = new task
   initialQueue?: Queue
+  pendingBlockerFor?: string
   onBack: () => void
-  onTaskClick?: (taskId: string) => void
-  onNewBlockerTask?: () => void
-  afterCreate?: (createdId: string) => void
 }
 
 export default function TaskDetailPage({
   taskId,
   initialQueue = 'todo',
+  pendingBlockerFor,
   onBack,
-  onTaskClick,
-  onNewBlockerTask,
-  afterCreate,
 }: TaskDetailPageProps) {
-  if (taskId) {
-    return <ExistingTaskLoader taskId={taskId} onBack={onBack} onTaskClick={onTaskClick} onNewBlockerTask={onNewBlockerTask} />
+  const [current, setCurrent] = useState<StackEntry>({ taskId, initialQueue, pendingBlockerFor })
+  const [stack, setStack] = useState<StackEntry[]>([])
+
+  function handleTaskClick(id: string) {
+    setStack(prev => [...prev.slice(-MAX_STACK_DEPTH + 1), current])
+    setCurrent({ taskId: id })
   }
-  return <TaskForm initialTitle="" initialDetails="" task={null} initialQueue={initialQueue} onBack={onBack} afterCreate={afterCreate} />
+
+  function handleNewTask(opts?: NewTaskOptions) {
+    setStack(prev => [...prev.slice(-MAX_STACK_DEPTH + 1), current])
+    setCurrent({ taskId: null, initialQueue: opts?.queue, pendingBlockerFor: opts?.pendingBlockerFor })
+  }
+
+  function handleParentBack() {
+    const prev = stack[stack.length - 1]
+    if (prev) {
+      setStack(s => s.slice(0, -1))
+      setCurrent(prev)
+    }
+  }
+
+  const parentBack = stack.length > 0 ? handleParentBack : undefined
+
+  if (current.taskId) {
+    return <ExistingTaskLoader taskId={current.taskId} onBack={onBack} onTaskClick={handleTaskClick} onNewTask={handleNewTask} onParentBack={parentBack} />
+  }
+  return <TaskForm initialTitle="" initialDetails="" task={null} initialQueue={current.initialQueue ?? 'todo'} onBack={onBack} pendingBlockerFor={current.pendingBlockerFor} onParentBack={parentBack} />
+}
+
+type NewTaskOptions = {
+  pendingBlockerFor?: string
+  queue?: Queue
 }
 
 type ExistingTaskLoaderProps = {
   taskId: string
   onBack: () => void
   onTaskClick?: (taskId: string) => void
-  onNewBlockerTask?: () => void
+  onNewTask?: (opts?: NewTaskOptions) => void
+  onParentBack?: () => void
 }
 
 function ExistingTaskLoader({
   taskId,
   onBack,
   onTaskClick,
-  onNewBlockerTask,
+  onNewTask,
+  onParentBack,
 }: ExistingTaskLoaderProps) {
   const { data: task, isLoading, error } = useQuery({
     queryKey: ['tasks', taskId],
@@ -78,7 +113,8 @@ function ExistingTaskLoader({
       initialQueue={task.queue}
       onBack={onBack}
       onTaskClick={onTaskClick}
-      onNewBlockerTask={onNewBlockerTask}
+      onNewTask={onNewTask}
+      onParentBack={onParentBack}
     />
   )
 }
@@ -90,10 +126,11 @@ type TaskFormProps = {
   initialDetails: string
   task: TaskResponse | null  // null = new task
   initialQueue: Queue
+  pendingBlockerFor?: string
   onBack: () => void
   onTaskClick?: (taskId: string) => void
-  onNewBlockerTask?: () => void
-  afterCreate?: (createdId: string) => void
+  onNewTask?: (opts?: NewTaskOptions) => void
+  onParentBack?: () => void
 }
 
 function TaskForm({
@@ -101,10 +138,11 @@ function TaskForm({
   initialDetails,
   task,
   initialQueue,
+  pendingBlockerFor,
   onBack,
   onTaskClick,
-  onNewBlockerTask,
-  afterCreate,
+  onNewTask,
+  onParentBack,
 }: TaskFormProps) {
   const queryClient = useQueryClient()
   const [title, setTitle] = useState(initialTitle)
@@ -153,11 +191,18 @@ function TaskForm({
       } else if (currentTitle.trim() !== '' && !createPendingRef.current) {
         createPendingRef.current = true
         createTask(currentTitle.trim(), currentDetails, queueRef.current)
-          .then((created) => {
+          .then(async (created) => {
             createPendingRef.current = false
             setCreatedId(created.id)
             queryClient.invalidateQueries({ queryKey: ['tasks'] })
-            afterCreate?.(created.id)
+            if (pendingBlockerFor) {
+              try {
+                await addBlocker(pendingBlockerFor, created.id)
+                queryClient.invalidateQueries({ queryKey: ['tasks'] })
+              } catch {
+                // blocker link failed silently — task was still created
+              }
+            }
             // If the user kept typing while the create was in flight,
             // the debounce skipped those saves. Catch up with a PATCH now.
             const latestTitle = titleRef.current
@@ -205,7 +250,7 @@ function TaskForm({
   const displayTitle = title || '(unnamed)'
 
   return (
-    <DetailShell onBack={onBack} onDelete={handleDelete}>
+    <DetailShell onBack={onBack} onDelete={handleDelete} onParentBack={onParentBack}>
       <div className="px-4 py-3">
         <div className="flex items-start gap-3">
           <div className="pt-1.75 shrink-0">
@@ -237,7 +282,7 @@ function TaskForm({
       </div>
 
       {task && taskId && (
-        <BlockersSection taskId={taskId} blockers={task.blockers} onTaskClick={onTaskClick} onNewBlockerTask={onNewBlockerTask} />
+        <BlockersSection taskId={taskId} blockers={task.blockers} queue={queue} onTaskClick={onTaskClick} onNewTask={onNewTask} />
       )}
 
       <div className="px-4 py-2 flex justify-center">
@@ -282,7 +327,7 @@ function BlockerRow({ blocker, onRemove, onTaskClick }: { blocker: Blocker; onRe
   )
 }
 
-function BlockersSection({ taskId, blockers, onTaskClick, onNewBlockerTask }: { taskId: string; blockers: Blocker[]; onTaskClick?: (taskId: string) => void; onNewBlockerTask?: () => void }) {
+function BlockersSection({ taskId, blockers, queue, onTaskClick, onNewTask }: { taskId: string; blockers: Blocker[]; queue: Queue; onTaskClick?: (taskId: string) => void; onNewTask?: (opts?: NewTaskOptions) => void }) {
   const queryClient = useQueryClient()
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -378,7 +423,7 @@ function BlockersSection({ taskId, blockers, onTaskClick, onNewBlockerTask }: { 
             ))}
           </ul>
           <button
-            onClick={() => { closeSearch(); onNewBlockerTask?.() }}
+            onClick={() => { closeSearch(); onNewTask?.({ pendingBlockerFor: taskId, queue }) }}
             className="w-full py-3 text-center text-gray-500 hover:text-gray-700"
           >
             + New blocker
@@ -426,15 +471,19 @@ function QueueToggle({ queue, onToggle }: { queue: Queue; onToggle: () => void }
   )
 }
 
-function DetailShell({ onBack, onDelete, children }: {
+function DetailShell({ onBack, onDelete, onParentBack, children }: {
   onBack: () => void
   onDelete?: () => void
+  onParentBack?: () => void
   children: React.ReactNode
 }) {
   return (
     <div className="flex-1 flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-        <BackButton onClick={onBack} />
+        <div className="flex items-center gap-1">
+          {onParentBack && <ParentBackButton onClick={onParentBack} />}
+          <BackButton onClick={onBack} />
+        </div>
         {onDelete && (
           <button
             onClick={onDelete}
