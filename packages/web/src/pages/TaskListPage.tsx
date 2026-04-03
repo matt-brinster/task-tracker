@@ -24,7 +24,14 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
 
   const { data: tasks, isLoading, error } = useQuery({
     queryKey: ['tasks'],
-    queryFn: fetchActiveTasks,
+    queryFn: async () => {
+      const result = await fetchActiveTasks()
+      // Seed individual task caches so BlockerRow doesn't need to fetch active tasks
+      for (const task of result) {
+        queryClient.setQueryData(['task', task.id], task)
+      }
+      return result
+    },
   })
 
   const archiveMutation = useMutation({
