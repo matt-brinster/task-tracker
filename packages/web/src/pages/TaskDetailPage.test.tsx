@@ -332,14 +332,16 @@ describe('TaskDetailPage — blockers section', () => {
 
   it('shows blocker as completed when not in active tasks cache', async () => {
     const qc = createQueryClient([]) // empty cache — blocker not present
+    const parentTask = makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
+    const completedBlocker = makeTask({ id: 'blocker-1', title: 'Fix the bug', completedAt: '2025-01-01T00:00:00.000Z' })
 
-    vi.spyOn(api, 'fetchTask').mockResolvedValue(
-      makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
-    )
+    vi.spyOn(api, 'fetchTask')
+      .mockResolvedValueOnce(parentTask)    // fetch for task-1
+      .mockResolvedValueOnce(completedBlocker) // fetch for blocker-1
 
     renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
 
-    // Blocker not in cache → assumed completed (archived/deleted)
+    // Blocker fetched individually and found completed
     expect(await screen.findByLabelText('Reopen "Fix the bug"')).toBeDefined()
   })
 })
@@ -368,8 +370,9 @@ describe('TaskDetailPage — internal navigation stack', () => {
     const qc = createQueryClient([blockerTask, parentTask])
 
     vi.spyOn(api, 'fetchTask')
-      .mockResolvedValueOnce(parentTask)
-      .mockResolvedValueOnce(blockerTask)
+      .mockResolvedValueOnce(parentTask)    // detail page fetch
+      .mockResolvedValueOnce(blockerTask)   // BlockerRow fetch
+      .mockResolvedValueOnce(blockerTask)   // navigate into blocker
 
     renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
 
@@ -387,8 +390,9 @@ describe('TaskDetailPage — internal navigation stack', () => {
     const qc = createQueryClient([blockerTask, parentTask])
 
     vi.spyOn(api, 'fetchTask')
-      .mockResolvedValueOnce(parentTask)
-      .mockResolvedValueOnce(blockerTask)
+      .mockResolvedValueOnce(parentTask)    // detail page fetch
+      .mockResolvedValueOnce(blockerTask)   // BlockerRow fetch
+      .mockResolvedValueOnce(blockerTask)   // navigate into blocker
 
     renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
 
@@ -405,9 +409,11 @@ describe('TaskDetailPage — internal navigation stack', () => {
     const qc = createQueryClient([blockerTask, parentTask])
 
     vi.spyOn(api, 'fetchTask')
-      .mockResolvedValueOnce(parentTask)
-      .mockResolvedValueOnce(blockerTask)
-      .mockResolvedValueOnce(parentTask)
+      .mockResolvedValueOnce(parentTask)    // detail page fetch
+      .mockResolvedValueOnce(blockerTask)   // BlockerRow fetch
+      .mockResolvedValueOnce(blockerTask)   // navigate into blocker
+      .mockResolvedValueOnce(parentTask)    // navigate back to parent
+      .mockResolvedValueOnce(blockerTask)   // BlockerRow fetch again
 
     renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
 
@@ -429,8 +435,9 @@ describe('TaskDetailPage — internal navigation stack', () => {
     const qc = createQueryClient([blockerTask, parentTask])
 
     vi.spyOn(api, 'fetchTask')
-      .mockResolvedValueOnce(parentTask)
-      .mockResolvedValueOnce(blockerTask)
+      .mockResolvedValueOnce(parentTask)    // detail page fetch
+      .mockResolvedValueOnce(blockerTask)   // BlockerRow fetch
+      .mockResolvedValueOnce(blockerTask)   // navigate into blocker
 
     renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
 
