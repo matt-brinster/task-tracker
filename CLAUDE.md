@@ -103,14 +103,6 @@ Phase 6b (auth):
 - `packages/web/src/pages/TaskDetailPage.tsx` — task detail/edit view. Unified flow for new and existing tasks: title and details are always editable with debounced autosave (`use-debounce`). New tasks created on first non-empty title; subsequent edits PATCHed. Queue toggle (segmented Todo/Backlog radio group) — for new tasks sets queue on create, for existing tasks calls `POST /tasks/:id/queue`. Delete button always visible. No explicit "Create" or "Save" button.
 - `packages/web/src/pages/SearchPage.tsx` — search view. Debounced text input (`use-debounce`, 300ms); empty input shows no results. Results include all non-deleted tasks (archived and completed). Checkbox toggles complete/reopen (reopening also clears `archivedAt`). Clicking a row navigates to task detail. Archived/completed tasks dimmed.
 - `packages/web/src/pages/SettingsPage.tsx` — settings page. Same header pattern as search/detail (back button left, "Settings" title centered). Logout button in the body (clears token, calls `onLogout`).
-- `packages/web/src/auth.test.ts` — tests for token helpers (4 tests)
-- `packages/web/src/api.test.ts` — tests for all API functions (28 tests)
-- `packages/web/src/App.test.tsx` — tests for auth guard rendering and backlog button (3 tests)
-- `packages/web/src/pages/LoginPage.test.tsx` — tests for login form submission and error display (4 tests)
-- `packages/web/src/pages/TaskListPage.test.tsx` — tests for task list page (24 tests)
-- `packages/web/src/pages/TaskDetailPage.test.tsx` — tests for task detail page and queue toggle (22 tests)
-- `packages/web/src/pages/SearchPage.test.tsx` — tests for search page (10 tests)
-- `packages/web/src/pages/SettingsPage.test.tsx` — tests for settings page (3 tests)
 - `packages/web/vitest.config.ts` — Vitest config with jsdom environment (no react plugin needed — vitest uses esbuild for JSX)
 - `packages/web/src/test-setup.ts` — React Testing Library cleanup between tests; stubs `ResizeObserver` (required by `@dnd-kit/react`, not provided by jsdom)
 
