@@ -234,6 +234,10 @@ taskRouter.post('/:id/blockers', async (req, res) => {
     res.status(400).json({ error: 'id is required' })
     return
   }
+  if (id === task.id) {
+    res.status(400).json({ error: 'A task cannot block itself' })
+    return
+  }
 
   const blockerTask = await findTaskById(req.userId, id)
   if (!blockerTask) {

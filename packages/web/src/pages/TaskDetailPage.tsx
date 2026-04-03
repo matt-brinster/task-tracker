@@ -1,28 +1,82 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDebouncedCallback } from 'use-debounce'
-import { fetchTask, updateTask, deleteTask, createTask, setQueue as setQueueApi } from '../api.ts'
+import { fetchTask, updateTask, deleteTask, createTask, setQueue as setQueueApi, addBlocker } from '../api.ts'
 import type { Queue, TaskResponse } from '../types.ts'
-import { useTaskMutations } from '../hooks/useTaskMutations.ts'
+import { useTaskMutations, invalidateTaskQueries } from '../hooks/useTaskMutations.ts'
 import BackButton from '../components/BackButton.tsx'
+import ParentBackButton from '../components/ParentBackButton.tsx'
 import Checkbox from '../components/Checkbox.tsx'
+import BlockersSection from '../components/BlockersSection.tsx'
+import type { NewTaskOptions } from '../components/BlockersSection.tsx'
 import Loading from '../components/Loading.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
 
-type Props = {
+const MAX_STACK_DEPTH = 10
+
+type StackEntry = {
+  taskId: string | null
+  initialQueue?: Queue
+  pendingBlockerFor?: string
+}
+
+type TaskDetailPageProps = {
   taskId: string | null  // null = new task
   initialQueue?: Queue
+  pendingBlockerFor?: string
   onBack: () => void
 }
 
-export default function TaskDetailPage({ taskId, initialQueue = 'todo', onBack }: Props) {
-  if (taskId) {
-    return <ExistingTaskLoader taskId={taskId} onBack={onBack} />
+export default function TaskDetailPage({
+  taskId,
+  initialQueue = 'todo',
+  pendingBlockerFor,
+  onBack,
+}: TaskDetailPageProps) {
+  const [current, setCurrent] = useState<StackEntry>({ taskId, initialQueue, pendingBlockerFor })
+  const [stack, setStack] = useState<StackEntry[]>([])
+
+  function handleTaskClick(id: string) {
+    setStack(prev => [...prev.slice(-MAX_STACK_DEPTH + 1), current])
+    setCurrent({ taskId: id })
   }
-  return <TaskForm initialTitle="" initialDetails="" task={null} initialQueue={initialQueue} onBack={onBack} />
+
+  function handleNewTask(opts?: NewTaskOptions) {
+    setStack(prev => [...prev.slice(-MAX_STACK_DEPTH + 1), current])
+    setCurrent({ taskId: null, initialQueue: opts?.queue, pendingBlockerFor: opts?.pendingBlockerFor })
+  }
+
+  function handleParentBack() {
+    const prev = stack[stack.length - 1]
+    if (prev) {
+      setStack(s => s.slice(0, -1))
+      setCurrent(prev)
+    }
+  }
+
+  const parentBack = stack.length > 0 ? handleParentBack : undefined
+
+  if (current.taskId) {
+    return <ExistingTaskLoader taskId={current.taskId} onBack={onBack} onTaskClick={handleTaskClick} onNewTask={handleNewTask} onParentBack={parentBack} />
+  }
+  return <TaskForm initialTitle="" initialDetails="" task={null} initialQueue={current.initialQueue ?? 'todo'} onBack={onBack} pendingBlockerFor={current.pendingBlockerFor} onParentBack={parentBack} />
 }
 
-function ExistingTaskLoader({ taskId, onBack }: { taskId: string; onBack: () => void }) {
+type ExistingTaskLoaderProps = {
+  taskId: string
+  onBack: () => void
+  onTaskClick?: (taskId: string) => void
+  onNewTask?: (opts?: NewTaskOptions) => void
+  onParentBack?: () => void
+}
+
+function ExistingTaskLoader({
+  taskId,
+  onBack,
+  onTaskClick,
+  onNewTask,
+  onParentBack,
+}: ExistingTaskLoaderProps) {
   const { data: task, isLoading, error } = useQuery({
     queryKey: ['tasks', taskId],
     queryFn: () => fetchTask(taskId),
@@ -53,6 +107,9 @@ function ExistingTaskLoader({ taskId, onBack }: { taskId: string; onBack: () => 
       task={task}
       initialQueue={task.queue}
       onBack={onBack}
+      onTaskClick={onTaskClick}
+      onNewTask={onNewTask}
+      onParentBack={onParentBack}
     />
   )
 }
@@ -64,10 +121,24 @@ type TaskFormProps = {
   initialDetails: string
   task: TaskResponse | null  // null = new task
   initialQueue: Queue
+  pendingBlockerFor?: string
   onBack: () => void
+  onTaskClick?: (taskId: string) => void
+  onNewTask?: (opts?: NewTaskOptions) => void
+  onParentBack?: () => void
 }
 
-function TaskForm({ initialTitle, initialDetails, task, initialQueue, onBack }: TaskFormProps) {
+function TaskForm({
+  initialTitle,
+  initialDetails,
+  task,
+  initialQueue,
+  pendingBlockerFor,
+  onBack,
+  onTaskClick,
+  onNewTask,
+  onParentBack,
+}: TaskFormProps) {
   const queryClient = useQueryClient()
   const [title, setTitle] = useState(initialTitle)
   const [details, setDetails] = useState(initialDetails)
@@ -89,7 +160,7 @@ function TaskForm({ initialTitle, initialDetails, task, initialQueue, onBack }: 
   const deleteMutation = useMutation({
     mutationFn: deleteTask,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      invalidateTaskQueries(queryClient)
       onBack()
     },
   })
@@ -97,13 +168,13 @@ function TaskForm({ initialTitle, initialDetails, task, initialQueue, onBack }: 
   const queueMutation = useMutation({
     mutationFn: (newQueue: Queue) => setQueueApi(taskId!, newQueue),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      invalidateTaskQueries(queryClient)
     },
   })
 
   function patchTask(id: string, patchTitle: string, patchDetails: string) {
     return updateTask(id, { title: patchTitle, details: patchDetails })
-      .then(() => queryClient.invalidateQueries({ queryKey: ['tasks'] }))
+      .then(() => invalidateTaskQueries(queryClient))
       .catch(() => setSaveError('Failed to save changes.'))
   }
 
@@ -115,10 +186,18 @@ function TaskForm({ initialTitle, initialDetails, task, initialQueue, onBack }: 
       } else if (currentTitle.trim() !== '' && !createPendingRef.current) {
         createPendingRef.current = true
         createTask(currentTitle.trim(), currentDetails, queueRef.current)
-          .then((created) => {
+          .then(async (created) => {
             createPendingRef.current = false
             setCreatedId(created.id)
-            queryClient.invalidateQueries({ queryKey: ['tasks'] })
+            invalidateTaskQueries(queryClient)
+            if (pendingBlockerFor) {
+              try {
+                await addBlocker(pendingBlockerFor, created.id)
+                invalidateTaskQueries(queryClient)
+              } catch {
+                // blocker link failed silently — task was still created
+              }
+            }
             // If the user kept typing while the create was in flight,
             // the debounce skipped those saves. Catch up with a PATCH now.
             const latestTitle = titleRef.current
@@ -166,7 +245,7 @@ function TaskForm({ initialTitle, initialDetails, task, initialQueue, onBack }: 
   const displayTitle = title || '(unnamed)'
 
   return (
-    <DetailShell onBack={onBack} onDelete={handleDelete}>
+    <DetailShell onBack={onBack} onDelete={handleDelete} onParentBack={onParentBack}>
       <div className="px-4 py-3">
         <div className="flex items-start gap-3">
           <div className="pt-1.75 shrink-0">
@@ -196,6 +275,10 @@ function TaskForm({ initialTitle, initialDetails, task, initialQueue, onBack }: 
           className="w-full h-32 border border-gray-200 rounded px-2 py-1 text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
         />
       </div>
+
+      {task && taskId && (
+        <BlockersSection taskId={taskId} blockers={task.blockers} queue={queue} onTaskClick={onTaskClick} onNewTask={onNewTask} />
+      )}
 
       <div className="px-4 py-2 flex justify-center">
         <QueueToggle queue={queue} onToggle={handleQueueToggle} />
@@ -239,15 +322,19 @@ function QueueToggle({ queue, onToggle }: { queue: Queue; onToggle: () => void }
   )
 }
 
-function DetailShell({ onBack, onDelete, children }: {
+function DetailShell({ onBack, onDelete, onParentBack, children }: {
   onBack: () => void
   onDelete?: () => void
+  onParentBack?: () => void
   children: React.ReactNode
 }) {
   return (
     <div className="flex-1 flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-        <BackButton onClick={onBack} />
+        <div className="flex items-center gap-1">
+          {onParentBack && <ParentBackButton onClick={onParentBack} />}
+          <BackButton onClick={onBack} />
+        </div>
         {onDelete && (
           <button
             onClick={onDelete}

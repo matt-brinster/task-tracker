@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchActiveTasks, archiveTasks, reorderTask } from '../api.ts'
-import { useTaskMutations } from '../hooks/useTaskMutations.ts'
+import { useTaskMutations, invalidateTaskQueries } from '../hooks/useTaskMutations.ts'
 import type { TaskResponse } from '../types.ts'
-import Checkbox from '../components/Checkbox.tsx'
+import CheckboxRow from '../components/CheckboxRow.tsx'
 import SectionDivider from '../components/SectionDivider.tsx'
 import Loading from '../components/Loading.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
@@ -24,13 +24,20 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
 
   const { data: tasks, isLoading, error } = useQuery({
     queryKey: ['tasks'],
-    queryFn: fetchActiveTasks,
+    queryFn: async () => {
+      const result = await fetchActiveTasks()
+      // Seed individual task caches so BlockerRow doesn't need to fetch active tasks
+      for (const task of result) {
+        queryClient.setQueryData(['task', task.id], task)
+      }
+      return result
+    },
   })
 
   const archiveMutation = useMutation({
     mutationFn: archiveTasks,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      invalidateTaskQueries(queryClient)
     },
   })
 
@@ -53,16 +60,22 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
     mutationFn: ({ id, beforeId, afterId }: { id: string, beforeId: string | null, afterId: string | null }) =>
       reorderTask(id, beforeId, afterId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      invalidateTaskQueries(queryClient)
     },
   })
 
+  const openTaskIds = new Set((tasks ?? []).filter(t => !t.completedAt).map(t => t.id))
+
   const todoTasks = (tasks ?? [])
-    .filter(t => t.queue === 'todo' && !isBlockedByOpenTask(t) && !isSnoozed(t))
+    .filter(t => t.queue === 'todo' && (t.completedAt !== null || !isBlockedByOpenTask(t, openTaskIds)) && !isSnoozed(t))
+    .sort((a, b) => a.sortOrder < b.sortOrder ? -1 : 1)
+
+  const blockedTasks = (tasks ?? [])
+    .filter(t => isBlockedByOpenTask(t, openTaskIds) && !t.completedAt && !isSnoozed(t))
     .sort((a, b) => a.sortOrder < b.sortOrder ? -1 : 1)
 
   const backlogTasks = (tasks ?? [])
-    .filter(t => t.queue === 'backlog' && !isBlockedByOpenTask(t) && !isSnoozed(t))
+    .filter(t => t.queue === 'backlog' && (t.completedAt !== null || !isBlockedByOpenTask(t, openTaskIds)) && !isSnoozed(t))
     .sort((a, b) => a.sortOrder < b.sortOrder ? -1 : 1)
 
   const completedTasks = tasks?.filter(t => t.completedAt !== null) ?? []
@@ -151,6 +164,23 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
           >
             + Task
           </button>
+          {blockedTasks.length > 0 && (
+            <div className="mt-4">
+              <SectionDivider label="Blocked" />
+              <ul>
+                {blockedTasks.map(task => (
+                  <li key={task.id} className="flex items-start">
+                    <CheckboxRow
+                      title={task.title}
+                      completedAt={task.completedAt}
+                      onCheck={() => handleCheckbox(task)}
+                      onClick={() => onTaskClick(task.id)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="mt-4">
             <SectionDivider label="Backlog" />
             <DragDropProvider
@@ -189,8 +219,9 @@ function SortableTaskRow({ id, index, group, task, onCheck, onClick, disabled }:
 
   return (
     <li ref={setElement} className="flex items-start">
-      <CheckBoxAndClickableTaskName
-        task={task}
+      <CheckboxRow
+        title={task.title}
+        completedAt={task.completedAt}
         onCheck={onCheck}
         onClick={onClick} />
       <div
@@ -204,32 +235,6 @@ function SortableTaskRow({ id, index, group, task, onCheck, onClick, disabled }:
   )
 }
 
-function CheckBoxAndClickableTaskName({ task, onCheck, onClick }: {
-  task: TaskResponse
-  onCheck: () => void
-  onClick: () => void
-}) {
-  const completed = task.completedAt !== null
-  const displayTitle = task.title || '(unnamed)'
-  return (
-    <>
-      <div className="px-4 pt-2.75 shrink-0">
-        <Checkbox
-          checked={completed}
-          onClick={onCheck}
-          displayTitle={displayTitle}
-        />
-      </div>
-      <button
-        onClick={onClick}
-        className="flex-1 text-left py-2 min-w-0 overflow-hidden"
-      >
-        <span className="block whitespace-nowrap overflow-hidden [mask-image:linear-gradient(to_right,black_94%,transparent)] text-gray-900">
-          {displayTitle}
-        </span>
-      </button>
-    </>)
-}
 
 function SearchIcon() {
   return (
@@ -274,9 +279,6 @@ function isSnoozed(task: TaskResponse): boolean {
   return new Date(task.snoozedUntil) > new Date()
 }
 
-function isBlockedByOpenTask(task: TaskResponse): boolean {
-  // For now, any blocker with no completedAt means the task is blocked.
-  // We don't have blocker completion data in the open tasks response,
-  // so we treat any task with blockers as blocked.
-  return task.blockers.length > 0
+function isBlockedByOpenTask(task: TaskResponse, openTaskIds: Set<string>): boolean {
+  return task.blockers.some(b => openTaskIds.has(b.id))
 }

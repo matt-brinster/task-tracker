@@ -48,6 +48,7 @@ function App() {
         )}
         {view.page === 'detail' && (
           <TaskDetailPage
+            key={view.taskId}
             taskId={view.taskId}
             initialQueue={view.initialQueue}
             onBack={() => setView({ page: 'list' })}

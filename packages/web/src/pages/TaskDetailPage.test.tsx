@@ -6,6 +6,11 @@ import TaskDetailPage from './TaskDetailPage.tsx'
 import * as api from '../api.ts'
 import type { TaskResponse } from '../types.ts'
 
+// stub SectionDivider to avoid rendering noise
+vi.mock('../components/SectionDivider.tsx', () => ({
+  default: ({ label }: { label: string }) => <div data-testid={`divider-${label}`}>{label}</div>,
+}))
+
 function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
   return {
     id: 'task-1',
@@ -21,12 +26,20 @@ function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
   }
 }
 
-function renderWithQuery(ui: React.ReactElement) {
+function createQueryClient(initialTasks?: TaskResponse[]) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
+  if (initialTasks) {
+    queryClient.setQueryData(['tasks'], initialTasks)
+  }
+  return queryClient
+}
+
+function renderWithQuery(ui: React.ReactElement, queryClient?: QueryClient) {
+  const qc = queryClient ?? createQueryClient()
   return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    <QueryClientProvider client={qc}>{ui}</QueryClientProvider>
   )
 }
 
@@ -192,6 +205,265 @@ describe('TaskDetailPage — new task', () => {
     await waitFor(() => {
       expect(screen.getByText('Failed to save task.')).toBeDefined()
     })
+  })
+})
+
+describe('TaskDetailPage — blockers section', () => {
+  const onBack = vi.fn()
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    onBack.mockReset()
+  })
+
+  it('shows Blockers section for existing tasks', async () => {
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    expect(await screen.findByTestId('divider-Blockers')).toBeDefined()
+  })
+
+  it('shows blocker titles in the list', async () => {
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(
+      makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
+    )
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    expect(await screen.findByText('Fix the bug')).toBeDefined()
+  })
+
+  it('shows + Blocker button', async () => {
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    expect(await screen.findByText('+ Blocker')).toBeDefined()
+  })
+
+  it('opens search input when + Blocker is clicked', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
+    vi.spyOn(api, 'fetchOpenTasks').mockResolvedValue([])
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    await user.click(await screen.findByText('+ Blocker'))
+
+    expect(screen.getByPlaceholderText('Search tasks...')).toBeDefined()
+  })
+
+  it('calls addBlocker when a search result is clicked', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
+    vi.spyOn(api, 'fetchOpenTasks').mockResolvedValue([
+      makeTask({ id: 'other-1', title: 'Other task' }),
+    ])
+    vi.spyOn(api, 'addBlocker').mockResolvedValue(
+      makeTask({ blockers: [{ id: 'other-1', title: 'Other task' }] })
+    )
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    await user.click(await screen.findByText('+ Blocker'))
+    await user.click(await screen.findByText('Other task'))
+
+    await waitFor(() => {
+      expect(api.addBlocker).toHaveBeenCalledWith('task-1', 'other-1')
+    })
+  })
+
+  it('calls removeBlocker when remove button is clicked', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(
+      makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
+    )
+    vi.spyOn(api, 'removeBlocker').mockResolvedValue(makeTask({ blockers: [] }))
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    await user.click(await screen.findByLabelText('Remove blocker "Fix the bug"'))
+
+    await waitFor(() => {
+      expect(api.removeBlocker).toHaveBeenCalledWith('task-1', 'blocker-1')
+    })
+  })
+
+  it('closes search and shows + Blocker again after clicking the back button', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
+    vi.spyOn(api, 'fetchOpenTasks').mockResolvedValue([])
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    await user.click(await screen.findByText('+ Blocker'))
+    expect(screen.getByPlaceholderText('Search tasks...')).toBeDefined()
+
+    // Two Back buttons exist: the page header and the search close button
+    const backButtons = screen.getAllByLabelText('Back')
+    await user.click(backButtons[backButtons.length - 1]!)
+
+    expect(screen.queryByPlaceholderText('Search tasks...')).toBeNull()
+    expect(screen.getByText('+ Blocker')).toBeDefined()
+  })
+
+  it('does not show Blockers section for new tasks', () => {
+    renderWithQuery(<TaskDetailPage taskId={null} onBack={onBack} />)
+
+    expect(screen.queryByTestId('divider-Blockers')).toBeNull()
+  })
+
+  it('shows blocker as incomplete when found in active tasks cache', async () => {
+    const blockerInCache = makeTask({ id: 'blocker-1', title: 'Fix the bug', completedAt: null })
+    const qc = createQueryClient([blockerInCache])
+
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(
+      makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
+    )
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
+
+    // Verify blocker title appears, then check the checkbox state
+    await screen.findByText('Fix the bug')
+    // Blocker is in cache with completedAt: null → shows as incomplete
+    expect(screen.getByLabelText('Complete "Fix the bug"')).toBeDefined()
+  })
+
+  it('shows blocker as completed when not in active tasks cache', async () => {
+    const qc = createQueryClient([]) // empty cache — blocker not present
+    const parentTask = makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
+    const completedBlocker = makeTask({ id: 'blocker-1', title: 'Fix the bug', completedAt: '2025-01-01T00:00:00.000Z' })
+
+    vi.spyOn(api, 'fetchTask')
+      .mockResolvedValueOnce(parentTask)    // fetch for task-1
+      .mockResolvedValueOnce(completedBlocker) // fetch for blocker-1
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
+
+    // Blocker fetched individually and found completed
+    expect(await screen.findByLabelText('Reopen "Fix the bug"')).toBeDefined()
+  })
+})
+
+describe('TaskDetailPage — internal navigation stack', () => {
+  const onBack = vi.fn()
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    onBack.mockReset()
+  })
+
+  it('does not show parent back button when there is no stack history', async () => {
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    await screen.findByDisplayValue('Buy milk')
+    expect(screen.queryByLabelText('Back to parent task')).toBeNull()
+  })
+
+  it('navigates to blocker task when blocker row is clicked', async () => {
+    const user = userEvent.setup()
+    const blockerTask = makeTask({ id: 'blocker-1', title: 'Fix the bug', blockers: [] })
+    const parentTask = makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
+    const qc = createQueryClient([blockerTask, parentTask])
+
+    vi.spyOn(api, 'fetchTask')
+      .mockResolvedValueOnce(parentTask)    // detail page fetch
+      .mockResolvedValueOnce(blockerTask)   // BlockerRow fetch
+      .mockResolvedValueOnce(blockerTask)   // navigate into blocker
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
+
+    // Click the blocker row text to navigate to it
+    await user.click(await screen.findByText('Fix the bug'))
+
+    // Should now show the blocker task's title
+    expect(await screen.findByDisplayValue('Fix the bug')).toBeDefined()
+  })
+
+  it('shows parent back button after navigating to a blocker', async () => {
+    const user = userEvent.setup()
+    const blockerTask = makeTask({ id: 'blocker-1', title: 'Fix the bug', blockers: [] })
+    const parentTask = makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
+    const qc = createQueryClient([blockerTask, parentTask])
+
+    vi.spyOn(api, 'fetchTask')
+      .mockResolvedValueOnce(parentTask)    // detail page fetch
+      .mockResolvedValueOnce(blockerTask)   // BlockerRow fetch
+      .mockResolvedValueOnce(blockerTask)   // navigate into blocker
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
+
+    await user.click(await screen.findByText('Fix the bug'))
+    await screen.findByDisplayValue('Fix the bug')
+
+    expect(screen.getByLabelText('Back to parent task')).toBeDefined()
+  })
+
+  it('parent back button returns to the previous task', async () => {
+    const user = userEvent.setup()
+    const blockerTask = makeTask({ id: 'blocker-1', title: 'Fix the bug', blockers: [] })
+    const parentTask = makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
+    const qc = createQueryClient([blockerTask, parentTask])
+
+    vi.spyOn(api, 'fetchTask')
+      .mockResolvedValueOnce(parentTask)    // detail page fetch
+      .mockResolvedValueOnce(blockerTask)   // BlockerRow fetch
+      .mockResolvedValueOnce(blockerTask)   // navigate into blocker
+      .mockResolvedValueOnce(parentTask)    // navigate back to parent
+      .mockResolvedValueOnce(blockerTask)   // BlockerRow fetch again
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
+
+    await user.click(await screen.findByText('Fix the bug'))
+    await screen.findByDisplayValue('Fix the bug')
+
+    await user.click(screen.getByLabelText('Back to parent task'))
+
+    // Should be back on the parent task
+    expect(await screen.findByDisplayValue('Buy milk')).toBeDefined()
+    // Parent back button should be gone (stack is empty)
+    expect(screen.queryByLabelText('Back to parent task')).toBeNull()
+  })
+
+  it('list back button always calls onBack regardless of stack depth', async () => {
+    const user = userEvent.setup()
+    const blockerTask = makeTask({ id: 'blocker-1', title: 'Fix the bug', blockers: [] })
+    const parentTask = makeTask({ blockers: [{ id: 'blocker-1', title: 'Fix the bug' }] })
+    const qc = createQueryClient([blockerTask, parentTask])
+
+    vi.spyOn(api, 'fetchTask')
+      .mockResolvedValueOnce(parentTask)    // detail page fetch
+      .mockResolvedValueOnce(blockerTask)   // BlockerRow fetch
+      .mockResolvedValueOnce(blockerTask)   // navigate into blocker
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />, qc)
+
+    await user.click(await screen.findByText('Fix the bug'))
+    await screen.findByDisplayValue('Fix the bug')
+
+    // Click the list back button (^), not the parent back button (<)
+    await user.click(screen.getByLabelText('Back'))
+
+    expect(onBack).toHaveBeenCalled()
+  })
+
+  it('navigating to new blocker shows empty form with parent back button', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask())
+    vi.spyOn(api, 'fetchOpenTasks').mockResolvedValue([])
+
+    renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
+
+    await user.click(await screen.findByText('+ Blocker'))
+    await user.click(await screen.findByText('+ New blocker'))
+
+    // Should show an empty task form
+    expect(screen.getByPlaceholderText('Task name')).toBeDefined()
+    // Should have parent back button
+    expect(screen.getByLabelText('Back to parent task')).toBeDefined()
   })
 })
 

@@ -73,9 +73,14 @@ export async function updateTask(id: string, fields: { title?: string; details?:
   return response.json() as Promise<TaskResponse>
 }
 
-export async function fetchTask(id: string): Promise<TaskResponse> {
-  const response = await fetchApi(`/tasks/${id}`)
-  return response.json() as Promise<TaskResponse>
+export async function fetchTask(id: string): Promise<TaskResponse | null> {
+  try {
+    const response = await fetchApi(`/tasks/${id}`)
+    return response.json() as Promise<TaskResponse>
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null
+    throw err
+  }
 }
 
 export async function completeTask(id: string): Promise<TaskResponse> {
@@ -109,6 +114,27 @@ export async function setQueue(id: string, queue: 'todo' | 'backlog'): Promise<T
   const response = await fetchApi(`/tasks/${id}/queue`, {
     method: 'POST',
     body: JSON.stringify({ queue }),
+  })
+  return response.json() as Promise<TaskResponse>
+}
+
+export async function searchOpenTasks(q: string, limit = 10): Promise<TaskResponse[]> {
+  const response = await fetchApi(`/tasks/open/search?q=${encodeURIComponent(q)}&limit=${limit}`)
+  return response.json() as Promise<TaskResponse[]>
+}
+
+export async function addBlocker(taskId: string, blockerId: string): Promise<TaskResponse> {
+  const response = await fetchApi(`/tasks/${taskId}/blockers`, {
+    method: 'POST',
+    body: JSON.stringify({ id: blockerId }),
+  })
+  return response.json() as Promise<TaskResponse>
+}
+
+export async function removeBlocker(taskId: string, blockerId: string): Promise<TaskResponse> {
+  const response = await fetchApi(`/tasks/${taskId}/blockers/remove`, {
+    method: 'POST',
+    body: JSON.stringify({ id: blockerId }),
   })
   return response.json() as Promise<TaskResponse>
 }
