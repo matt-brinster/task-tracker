@@ -287,7 +287,6 @@ Web frontend for the task manager. Single-page application — client-side routi
 - **Move to/from Backlog with Drag and Drop** — Library problems prevented an easy win. It may be more trouble than it is worth, but let's see if it looks like a gap after the rest of the features are in place.
 - **Feature toggles** — This thing is turning out to be very feature rich. Maybe allow for opt outs.
 - **Blocker enhancements** 
-  - Faster creation of multiple blockers, avoid returning to the main list after creation
   - New task can get blockers too
   - Allow reordering of blocked items
   - Allow reordering of blockers (How without inviting fat-finger mistakes? Swipes? )
