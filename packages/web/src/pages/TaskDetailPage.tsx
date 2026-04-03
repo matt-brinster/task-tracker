@@ -11,7 +11,7 @@ import SectionDivider from '../components/SectionDivider.tsx'
 import Loading from '../components/Loading.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
 
-type Props = {
+type TaskDetailPageProps = {
   taskId: string | null  // null = new task
   initialQueue?: Queue
   onBack: () => void
@@ -20,14 +20,33 @@ type Props = {
   afterCreate?: (createdId: string) => void
 }
 
-export default function TaskDetailPage({ taskId, initialQueue = 'todo', onBack, onTaskClick, onNewBlockerTask, afterCreate }: Props) {
+export default function TaskDetailPage({
+  taskId,
+  initialQueue = 'todo',
+  onBack,
+  onTaskClick,
+  onNewBlockerTask,
+  afterCreate,
+}: TaskDetailPageProps) {
   if (taskId) {
     return <ExistingTaskLoader taskId={taskId} onBack={onBack} onTaskClick={onTaskClick} onNewBlockerTask={onNewBlockerTask} />
   }
   return <TaskForm initialTitle="" initialDetails="" task={null} initialQueue={initialQueue} onBack={onBack} afterCreate={afterCreate} />
 }
 
-function ExistingTaskLoader({ taskId, onBack, onTaskClick, onNewBlockerTask }: { taskId: string; onBack: () => void; onTaskClick?: (taskId: string) => void; onNewBlockerTask?: () => void }) {
+type ExistingTaskLoaderProps = {
+  taskId: string
+  onBack: () => void
+  onTaskClick?: (taskId: string) => void
+  onNewBlockerTask?: () => void
+}
+
+function ExistingTaskLoader({
+  taskId,
+  onBack,
+  onTaskClick,
+  onNewBlockerTask,
+}: ExistingTaskLoaderProps) {
   const { data: task, isLoading, error } = useQuery({
     queryKey: ['tasks', taskId],
     queryFn: () => fetchTask(taskId),
@@ -77,7 +96,16 @@ type TaskFormProps = {
   afterCreate?: (createdId: string) => void
 }
 
-function TaskForm({ initialTitle, initialDetails, task, initialQueue, onBack, onTaskClick, onNewBlockerTask, afterCreate }: TaskFormProps) {
+function TaskForm({
+  initialTitle,
+  initialDetails,
+  task,
+  initialQueue,
+  onBack,
+  onTaskClick,
+  onNewBlockerTask,
+  afterCreate,
+}: TaskFormProps) {
   const queryClient = useQueryClient()
   const [title, setTitle] = useState(initialTitle)
   const [details, setDetails] = useState(initialDetails)
