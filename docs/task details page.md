@@ -25,8 +25,9 @@ Notes:
 - the back button ^ sticks to the top always. Always goes back to task list.
 - task name and blockers can be competed from this screen.
 - A red box with X will be in the top right corner, not displayed on mockup. This is the delete button.
-- (Clear snooze) will be a blue button round sides
-- Un-snoozed task will have a TBD time picker, probably days, hours, minutes with resulting datetime displayed.
+- Snooze section: three preset buttons (1 Hour, 1 Day, 1 Week) + "Pick date" button. All auto-save instantly.
+- Clicking a preset or "Pick date" expands to show native datetime-local picker + "Clear Snooze" button.
+- Presets update the picker value. Picker changes auto-save. "Clear Snooze" wakes the task and collapses the section.
 - Clicking + blocker will open a in-line area with search bar, displaying the 5 top tasks by default.
   - the page will scroll down to have blocked on top of the page unless the whole thing page fits anyway.
     - other than the back button

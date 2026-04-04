@@ -281,18 +281,20 @@ function TaskForm({
         <BlockersSection taskId={taskId} blockers={task.blockers} queue={queue} onTaskClick={onTaskClick} onNewTask={onNewTask} />
       )}
 
-      <div className="px-4 py-2 flex justify-center">
-        <QueueToggle queue={queue} onToggle={handleQueueToggle} />
-      </div>
-
       {task && taskId && (
         <SnoozeSection
           task={task}
-          onSnooze={() => snoozeMutation.mutate({ id: taskId, until: new Date(Date.now() + 60 * 60 * 1000) })}
+          onSnooze={(until) => snoozeMutation.mutate({ id: taskId, until })}
           onWake={() => wakeMutation.mutate(taskId)}
           isPending={snoozeMutation.isPending || wakeMutation.isPending}
         />
       )}
+
+      <SectionDivider label="Backlog" />
+
+      <div className="px-4 py-2 flex justify-center">
+        <QueueToggle queue={queue} onToggle={handleQueueToggle} />
+      </div>
 
       {saveError && (
         <div className="px-4">
@@ -317,7 +319,7 @@ function QueueToggle({ queue, onToggle }: { queue: Queue; onToggle: () => void }
         onClick={queue === 'todo' ? undefined : onToggle}
         className={`px-3 py-1 rounded-l ${queue === 'todo' ? 'bg-blue-500 text-white' : 'text-gray-500 hover:text-gray-700'}`}
       >
-        Todo
+        Active
       </button>
       <button
         type="button"
@@ -367,33 +369,84 @@ function isSnoozed(task: TaskResponse): boolean {
   return new Date(task.snoozedUntil) > new Date()
 }
 
-function formatSnoozeDate(iso: string): string {
-  const date = new Date(iso)
-  return date.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
+function toLocalDatetimeString(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  const h = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  return `${y}-${m}-${d}T${h}:${min}`
 }
+
+const SNOOZE_PRESETS = [
+  { label: '1 Hour', ms: 60 * 60 * 1000 },
+  { label: '1 Day', ms: 24 * 60 * 60 * 1000 },
+  { label: '1 Week', ms: 7 * 24 * 60 * 60 * 1000 },
+] as const
 
 function SnoozeSection({ task, onSnooze, onWake, isPending }: {
   task: TaskResponse
-  onSnooze: () => void
+  onSnooze: (until: Date) => void
   onWake: () => void
   isPending: boolean
 }) {
   const snoozed = isSnoozed(task)
+  const [expanded, setExpanded] = useState(snoozed)
+  const [pickerValue, setPickerValue] = useState(
+    task.snoozedUntil ? toLocalDatetimeString(new Date(task.snoozedUntil)) : ''
+  )
+
+  function handlePreset(ms: number) {
+    const until = new Date(Date.now() + ms)
+    setPickerValue(toLocalDatetimeString(until))
+    setExpanded(true)
+    onSnooze(until)
+  }
+
+  function handlePickerChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setPickerValue(e.target.value)
+    const date = new Date(e.target.value)
+    if (!isNaN(date.getTime())) onSnooze(date)
+  }
+
+  function handleClear() {
+    setPickerValue('')
+    setExpanded(false)
+    onWake()
+  }
+
+  // Minimum datetime for the picker: now, rounded up to the next minute
+  const minDatetime = toLocalDatetimeString(
+    new Date(Math.ceil(Date.now() / 60000) * 60000)
+  )
 
   return (
     <div className="mt-2">
       <SectionDivider label="Snooze" />
       <div className="flex flex-col items-center gap-2 py-2">
-        {snoozed ? (
-          <>
-            <span className="text-sm text-gray-600">{formatSnoozeDate(task.snoozedUntil!)}</span>
+        <div className="flex gap-2">
+          {SNOOZE_PRESETS.map(preset => (
             <button
-              onClick={onWake}
+              key={preset.label}
+              onClick={() => handlePreset(preset.ms)}
+              disabled={isPending}
+              className="px-3 py-1 text-sm text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 disabled:opacity-50"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+        {expanded ? (
+          <>
+            <input
+              type="datetime-local"
+              min={minDatetime}
+              value={pickerValue}
+              onChange={handlePickerChange}
+              className="text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+            />
+            <button
+              onClick={handleClear}
               disabled={isPending}
               className="px-4 py-1 text-sm text-blue-600 bg-blue-50 rounded-full hover:bg-blue-100 disabled:opacity-50"
             >
@@ -402,11 +455,11 @@ function SnoozeSection({ task, onSnooze, onWake, isPending }: {
           </>
         ) : (
           <button
-            onClick={onSnooze}
+            onClick={() => handlePreset(60 * 60 * 1000)}
             disabled={isPending}
-            className="px-4 py-1 text-sm text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 disabled:opacity-50"
+            className="px-3 py-1 text-sm text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200 disabled:opacity-50"
           >
-            1 Hour
+            Pick date
           </button>
         )}
       </div>
