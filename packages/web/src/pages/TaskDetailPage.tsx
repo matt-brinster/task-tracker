@@ -151,6 +151,9 @@ function TaskForm({
   const taskId = task?.id ?? createdId
 
   const createPendingRef = useRef(false)
+  // Ref mirrors createdId so the debounce callback sees the latest value
+  // (the argument passed at onChange time may be stale by the time the callback fires)
+  const createdIdRef = useRef(createdId)
   // Track latest values so the create callback can detect drift and follow up with a PATCH
   const titleRef = useRef(title)
   const detailsRef = useRef(details)
@@ -182,13 +185,16 @@ function TaskForm({
   const debouncedSave = useDebouncedCallback(
     (currentTitle: string, currentDetails: string, currentTaskId: string | null) => {
       setSaveError(null)
-      if (currentTaskId) {
-        patchTask(currentTaskId, currentTitle, currentDetails)
+      // Prefer the ref — the argument may have been captured before the create resolved
+      const resolvedId = currentTaskId ?? createdIdRef.current
+      if (resolvedId) {
+        patchTask(resolvedId, currentTitle, currentDetails)
       } else if (currentTitle.trim() !== '' && !createPendingRef.current) {
         createPendingRef.current = true
         createTask(currentTitle.trim(), currentDetails, queueRef.current)
           .then(async (created) => {
             createPendingRef.current = false
+            createdIdRef.current = created.id
             setCreatedId(created.id)
             invalidateTaskQueries(queryClient)
             if (pendingBlockerFor) {
