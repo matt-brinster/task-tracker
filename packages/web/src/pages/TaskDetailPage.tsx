@@ -287,7 +287,7 @@ function TaskForm({
         <BlockersSection taskId={taskId ?? ''} blockers={task?.blockers ?? []} queue={queue} onTaskClick={onTaskClick} onNewTask={onNewTask} />
 
         <SnoozeSection
-          task={task ?? { id: '', title: '', details: '', blockers: [], queue, completedAt: null, archivedAt: null, snoozedUntil: null, sortOrder: 'a0' }}
+          task={task ?? { id: '', title: '', details: '', blockers: [], queue, completedAt: null, archivedAt: null, snoozedUntil: null, sortOrder: '' }}
           onSnooze={(until) => { if (taskId) snoozeMutation.mutate({ id: taskId, until }) }}
           onWake={() => { if (taskId) wakeMutation.mutate(taskId) }}
           isPending={snoozeMutation.isPending || wakeMutation.isPending}
