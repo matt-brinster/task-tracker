@@ -283,23 +283,21 @@ function TaskForm({
         />
       </div>
 
-      {task && taskId && (
-        <BlockersSection taskId={taskId} blockers={task.blockers} queue={queue} onTaskClick={onTaskClick} onNewTask={onNewTask} />
-      )}
+      <div className={taskId ? '' : 'opacity-40 pointer-events-none'} aria-disabled={!taskId}>
+        <BlockersSection taskId={taskId ?? ''} blockers={task?.blockers ?? []} queue={queue} onTaskClick={onTaskClick} onNewTask={onNewTask} />
 
-      {task && taskId && (
         <SnoozeSection
-          task={task}
-          onSnooze={(until) => snoozeMutation.mutate({ id: taskId, until })}
-          onWake={() => wakeMutation.mutate(taskId)}
+          task={task ?? { id: '', title: '', details: '', blockers: [], queue, completedAt: null, archivedAt: null, snoozedUntil: null, sortOrder: '' }}
+          onSnooze={(until) => { if (taskId) snoozeMutation.mutate({ id: taskId, until }) }}
+          onWake={() => { if (taskId) wakeMutation.mutate(taskId) }}
           isPending={snoozeMutation.isPending || wakeMutation.isPending}
         />
-      )}
 
-      <SectionDivider label="Backlog" />
+        <SectionDivider label="Backlog" />
 
-      <div className="px-4 py-2 flex justify-center">
-        <QueueToggle queue={queue} onToggle={handleQueueToggle} />
+        <div className="px-4 py-2 flex justify-center">
+          <QueueToggle queue={queue} onToggle={handleQueueToggle} />
+        </div>
       </div>
 
       {saveError && (
