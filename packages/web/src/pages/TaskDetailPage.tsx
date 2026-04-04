@@ -319,7 +319,7 @@ function QueueToggle({ queue, onToggle }: { queue: Queue; onToggle: () => void }
         onClick={queue === 'todo' ? undefined : onToggle}
         className={`px-3 py-1 rounded-l ${queue === 'todo' ? 'bg-blue-500 text-white' : 'text-gray-500 hover:text-gray-700'}`}
       >
-        Active
+        To Do
       </button>
       <button
         type="button"
