@@ -43,7 +43,7 @@ npx tsx --env-file=packages/api/.env src/admin/provision-cli.ts --email name@exa
 **Phase 4: Blocker Fan-out on Delete** — complete.
 **Phase 5: Local Deployment** — complete.
 **Phase 5.5: Monorepo Restructure** — complete.
-**Phase 6: Frontend** — in progress (6a–6c complete, search complete, backlog complete, banner/navigation complete, blockers complete; remaining features are independent: snooze, deploy).
+**Phase 6: Frontend** — in progress (6a–6c complete, search complete, backlog complete, banner/navigation complete, blockers complete, snooze detail page complete; remaining features are independent: snooze task list section, deploy).
 
 Completed:
 - `packages/api/src/domain/task.ts` — `Task` type (includes `sortOrder: string`), `CreateTaskOptions` type, and `createTask(userId, title, options?)` factory (uses UUIDv7 for IDs)
@@ -116,7 +116,7 @@ See `docs/TASK_MANAGER_PROJECT_PLAN.md` for the full roadmap.
   - `src/repository/` — persistence
   - `src/routes/` — HTTP layer (Express route handlers, middleware)
   - `src/admin/` — CLI tooling (provisioning)
-- `packages/web/` — the frontend (Phase 6c + search complete): React SPA, Vite 7, TanStack Query, Tailwind CSS v4. No client-side routing — all UI renders at `/`, using conditional rendering based on auth state (`list` | `detail` | `search` views). Mobile-first layout: UI constrained to a narrow centered column (`max-w-md`) on all screen sizes. Working: auth, task list, create/edit, complete/reopen, delete, archive, search, backlog (queue toggle + backlog section), drag-and-drop reordering (within todo and backlog sections independently). Remaining independent features: blockers, snooze.
+- `packages/web/` — the frontend (Phase 6c + search complete): React SPA, Vite 7, TanStack Query, Tailwind CSS v4. No client-side routing — all UI renders at `/`, using conditional rendering based on auth state (`list` | `detail` | `search` views). Mobile-first layout: UI constrained to a narrow centered column (`max-w-md`) on all screen sizes. Working: auth, task list, create/edit, complete/reopen, delete, archive, search, backlog (queue toggle + backlog section), drag-and-drop reordering (within todo and backlog sections independently), blockers, snooze (detail page: preset buttons + native datetime-local picker, auto-save, clear snooze). Remaining independent features: snooze task list section, deploy.
 
 There is **no state machine** and no derived "status" field. The domain exposes raw data; the API and UI decide how to present it. Domain predicates may be added as needed (e.g. `isComplete`, `isSnoozed`), but status display logic belongs to the presentation layer.
 

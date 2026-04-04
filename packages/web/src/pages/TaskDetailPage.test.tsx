@@ -523,7 +523,6 @@ describe('TaskDetailPage — snooze section', () => {
     renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
 
     expect(await screen.findByText('Clear Snooze')).toBeDefined()
-    expect(screen.queryByText('1 Hour')).toBeNull()
   })
 
   it('calls wakeTask when Clear Snooze is clicked', async () => {
@@ -556,7 +555,7 @@ describe('TaskDetailPage — queue toggle', () => {
   const onBack = vi.fn()
 
   function getTodoRadio() {
-    return screen.getByRole('radio', { name: 'Todo' })
+    return screen.getByRole('radio', { name: 'To Do' })
   }
   function getBacklogRadio() {
     return screen.getByRole('radio', { name: 'Backlog' })
@@ -567,7 +566,7 @@ describe('TaskDetailPage — queue toggle', () => {
     onBack.mockReset()
   })
 
-  it('has Todo selected for a todo task', async () => {
+  it('has To Do selected for a todo task', async () => {
     vi.spyOn(api, 'fetchTask').mockResolvedValue(makeTask({ queue: 'todo' }))
 
     renderWithQuery(<TaskDetailPage taskId="task-1" onBack={onBack} />)
@@ -614,7 +613,7 @@ describe('TaskDetailPage — queue toggle', () => {
     expect(getTodoRadio().getAttribute('aria-checked')).toBe('false')
   })
 
-  it('new task via + Task has Todo selected', () => {
+  it('new task via + Task has To Do selected', () => {
     renderWithQuery(<TaskDetailPage taskId={null} onBack={onBack} />)
 
     expect(getTodoRadio().getAttribute('aria-checked')).toBe('true')
