@@ -308,10 +308,12 @@ describe('TaskDetailPage — blockers section', () => {
     expect(screen.getByText('+ Blocker')).toBeDefined()
   })
 
-  it('does not show Blockers section for new tasks', () => {
+  it('shows Blockers section greyed out for new tasks', () => {
     renderWithQuery(<TaskDetailPage taskId={null} onBack={onBack} />)
 
-    expect(screen.queryByTestId('divider-Blockers')).toBeNull()
+    expect(screen.queryByTestId('divider-Blockers')).not.toBeNull()
+    const wrapper = screen.getByTestId('divider-Blockers').closest('[aria-disabled]')
+    expect(wrapper?.getAttribute('aria-disabled')).toBe('true')
   })
 
   it('shows blocker as incomplete when found in active tasks cache', async () => {
@@ -483,10 +485,12 @@ describe('TaskDetailPage — snooze section', () => {
     expect(await screen.findByTestId('divider-Snooze')).toBeDefined()
   })
 
-  it('does not show Snooze section for new tasks', () => {
+  it('shows Snooze section greyed out for new tasks', () => {
     renderWithQuery(<TaskDetailPage taskId={null} onBack={onBack} />)
 
-    expect(screen.queryByTestId('divider-Snooze')).toBeNull()
+    expect(screen.queryByTestId('divider-Snooze')).not.toBeNull()
+    const wrapper = screen.getByTestId('divider-Snooze').closest('[aria-disabled]')
+    expect(wrapper?.getAttribute('aria-disabled')).toBe('true')
   })
 
   it('shows 1 Hour button when task is not snoozed', async () => {
