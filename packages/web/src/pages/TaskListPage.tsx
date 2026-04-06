@@ -8,7 +8,8 @@ import Loading from '../components/Loading.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
 import { useSortable, isSortable } from '@dnd-kit/react/sortable'
 import { useState } from 'react'
-import { DragDropProvider } from '@dnd-kit/react'
+import { DragDropProvider, PointerSensor, } from '@dnd-kit/react'
+import { PointerActivationConstraints } from '@dnd-kit/dom'
 
 type Props = {
   onSettings: () => void
@@ -17,6 +18,26 @@ type Props = {
   onNewBacklog: () => void
   onSearch: () => void
 }
+
+const sensor = PointerSensor.configure({
+  activationConstraints(event) {
+    const { pointerType } = event;
+
+    // Custom constraints based on pointer type
+    switch (pointerType) {
+      case 'mouse':
+      case 'touch': // give touch the same treatment as default mouse: touch and drag more that 5px activates drag-drop
+        return [
+          new PointerActivationConstraints.Distance({ value: 5 }),
+        ];
+      default: // Don't change default/pen behavior yet.
+        return [
+          new PointerActivationConstraints.Delay({ value: 200, tolerance: 10 }),
+          new PointerActivationConstraints.Distance({ value: 5 }),
+        ];
+    }
+  },
+});
 
 export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNewBacklog, onSearch }: Props) {
   const queryClient = useQueryClient()
@@ -147,6 +168,7 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
         <div className="flex-1 overflow-y-auto">
           <DragDropProvider
             onDragEnd={handleOnDragEnd}
+            sensors={[sensor]}
           >
             <ul key="todo">
               {todoTasks.map((task, index) => (
@@ -206,6 +228,7 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
             <SectionDivider label="Backlog" />
             <DragDropProvider
               onDragEnd={handleOnDragEnd}
+              sensors={[sensor]}
             >
               <ul key="backlog">
                 {backlogTasks.map((task, index) => (
