@@ -16,6 +16,15 @@ vi.mock('@dnd-kit/react', () => ({
     dnd.onDragEnd = onDragEnd
     return children
   },
+  PointerSensor: { configure: () => ({}) },
+  KeyboardSensor: {},
+}))
+
+vi.mock('@dnd-kit/dom', () => ({
+  PointerActivationConstraints: {
+    Distance: class { constructor() {} },
+    Delay: class { constructor() {} },
+  },
 }))
 
 vi.mock('@dnd-kit/react/sortable', () => ({

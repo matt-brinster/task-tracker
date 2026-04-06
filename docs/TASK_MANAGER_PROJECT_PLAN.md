@@ -275,7 +275,7 @@ Web frontend for the task manager. Single-page application — client-side routi
     - Part 1: 1 hour snooze ✅
     - Part 2: user selectable snooze time (days/hours/minutes) ✅ — preset buttons (1h/1d/1w)
     - Part 3: Date/time picker ✅ — native `datetime-local`, presets update picker value
-  - **Prioritization** ✅ — `sortOrder: string` field on Task using fractional indexing (`fractional-indexing` library). `POST /tasks` accepts optional `position: "top" | "bottom"` (default bottom). `POST /tasks/:id/reorder` accepts `{ afterId, beforeId }` (nullable) and computes a new key between neighbors. Drag-and-drop on task list page (`@dnd-kit/react`): separate `DragDropProvider` per section enforces within-group reordering only; grip handle detached during pending mutation to prevent concurrent reorders.
+  - **Prioritization** ✅ — `sortOrder: string` field on Task using fractional indexing (`fractional-indexing` library). `POST /tasks` accepts optional `position: "top" | "bottom"` (default bottom). `POST /tasks/:id/reorder` accepts `{ afterId, beforeId }` (nullable) and computes a new key between neighbors. Drag-and-drop on task list page (`@dnd-kit/react`): separate `DragDropProvider` per section (todo, backlog, blocked, snoozed) enforces within-group reordering only; grip handle detached during pending mutation to prevent concurrent reorders. Custom sensor config: touch uses 5px distance threshold (matching mouse) for immediate drag activation on mobile.
   - **Banner and Navigation** ✅ — Top banner on task list: search icon (left), archive icon + gear icon (right). Gear navigates to a full SettingsPage (same header pattern as search/detail). Logout lives on the settings page.
   - **Admin page** — Admin-only UI and API. Add `isAdmin` to User model, admin auth middleware (403 for non-admins). Admin page: list users, create new user (enter email → user created). Initially triggers invitation key generation (displayed to admin); later triggers email code send. API: `GET /admin/users`, `POST /admin/users` (creates user), `POST /admin/users/:id/send-code` (sends email code, added with email system). Frontend: new page accessible only to admin users, navigation from settings section. Independent of task features; depends on deploy only if email is needed.
   - **Email codes** — Replace invitation keys with 8-digit numeric codes. New `email_codes` collection (`id`, `userId`, `codeHash`, `createdAt`, `expiresAt`, `redeemedAt`). New domain type and factory (`createEmailCode`). Repository: `insertEmailCode`, `findEmailCodeByHash`, `markRedeemed`. New endpoint `POST /auth/redeem-code` (accepts `{ code }`, validates, creates session). Email service: Resend or SendGrid (both have free tiers sufficient for this scale). Local dev: console log transport (log code to stdout) or Mailpit in docker-compose — no real emails in dev/test. Admin triggers send from admin page. Codes: 8-digit numeric, single-use, 4-hour expiry. **Depends on:** admin page (for send UI), deploy (for email service config).
@@ -291,14 +291,7 @@ Web frontend for the task manager. Single-page application — client-side routi
 - **Feature toggles** — This thing is turning out to be very feature rich. Maybe allow for opt outs.
 - **Blocker enhancements** 
   - New task can get blockers too
-  - Allow reordering of blocked items
   - Allow reordering of blockers (How without inviting fat-finger mistakes? Swipes? )
-
-## Tooling
-- **OS:** Windows with WSL (Ubuntu) for development
-- **IDE:** VS Code with WSL extension
-- **Node.js:** Installed inside WSL; Node 22 LTS via nvm
-- **Package manager:** npm (comes with Node)
-- **Version control:** Git (configured inside WSL)
-- **Project location:** `/mnt/c/dev/task-tracker` (Windows filesystem via WSL). `.gitattributes` normalizes line endings to LF.
-
+- **UI polish** 
+  - confirm delete? Trash Icon?
+  - Different, not trashcan looking archive icon?
