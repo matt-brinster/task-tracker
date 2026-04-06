@@ -8,7 +8,8 @@ import Loading from '../components/Loading.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
 import { useSortable, isSortable } from '@dnd-kit/react/sortable'
 import { useState } from 'react'
-import { DragDropProvider } from '@dnd-kit/react'
+import { DragDropProvider, PointerSensor, KeyboardSensor } from '@dnd-kit/react'
+import { PointerActivationConstraints } from '@dnd-kit/dom'
 
 type Props = {
   onSettings: () => void
@@ -17,6 +18,31 @@ type Props = {
   onNewBacklog: () => void
   onSearch: () => void
 }
+
+const DragDropProviderSensors = [
+  PointerSensor.configure({
+    activationConstraints(event) {
+      const { pointerType } = event;
+      switch (pointerType) {
+        // give touch the same treatment as out-of-the-box mouse: 
+        // touch and drag more than 5px activates drag-drop
+        case 'mouse':
+        case 'touch': // intentional fall-though
+          return [
+            new PointerActivationConstraints.Distance({ value: 5 }),
+          ];
+        // Don't change default/pen behavior yet.
+        default:
+          return [
+            new PointerActivationConstraints.Delay({ value: 200, tolerance: 10 }),
+            new PointerActivationConstraints.Distance({ value: 5 }),
+          ];
+      }
+    },
+  }),
+  // do not alter keyboard at all
+  KeyboardSensor
+];
 
 export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNewBacklog, onSearch }: Props) {
   const queryClient = useQueryClient()
@@ -147,6 +173,7 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
         <div className="flex-1 overflow-y-auto">
           <DragDropProvider
             onDragEnd={handleOnDragEnd}
+            sensors={DragDropProviderSensors}
           >
             <ul key="todo">
               {todoTasks.map((task, index) => (
@@ -206,6 +233,7 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
             <SectionDivider label="Backlog" />
             <DragDropProvider
               onDragEnd={handleOnDragEnd}
+              sensors={DragDropProviderSensors}
             >
               <ul key="backlog">
                 {backlogTasks.map((task, index) => (
