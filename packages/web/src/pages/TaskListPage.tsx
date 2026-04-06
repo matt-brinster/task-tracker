@@ -124,7 +124,12 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
       } = operation.source
 
       if (fromIndex === toIndex) return
-      const listMap: Record<string, TaskResponse[]> = { todo: todoTasks, backlog: backlogTasks, blocked: blockedTasks, snoozed: snoozedTasks }
+      const listMap: Record<string, TaskResponse[]> = { 
+        todo: todoTasks,
+        backlog: backlogTasks,
+        blocked: blockedTasks,
+        snoozed: snoozedTasks 
+      }
       const list = listMap[fromGroupName]
       if (!list) return
       const reordered = [...list]
