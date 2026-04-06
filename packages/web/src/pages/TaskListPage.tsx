@@ -8,7 +8,7 @@ import Loading from '../components/Loading.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
 import { useSortable, isSortable } from '@dnd-kit/react/sortable'
 import { useState } from 'react'
-import { DragDropProvider, PointerSensor, } from '@dnd-kit/react'
+import { DragDropProvider, PointerSensor } from '@dnd-kit/react'
 import { PointerActivationConstraints } from '@dnd-kit/dom'
 
 type Props = {
@@ -19,18 +19,20 @@ type Props = {
   onSearch: () => void
 }
 
-const sensor = PointerSensor.configure({
+const pointerSensor = PointerSensor.configure({
   activationConstraints(event) {
     const { pointerType } = event;
-
     // Custom constraints based on pointer type
     switch (pointerType) {
+      // give touch the same treatment as out-of-the-box mouse: 
+      // touch and drag more than 5px activates drag-drop
       case 'mouse':
-      case 'touch': // give touch the same treatment as default mouse: touch and drag more that 5px activates drag-drop
+      case 'touch': // intentional fall-though
         return [
           new PointerActivationConstraints.Distance({ value: 5 }),
         ];
-      default: // Don't change default/pen behavior yet.
+      // Don't change default/pen behavior yet.
+      default: 
         return [
           new PointerActivationConstraints.Delay({ value: 200, tolerance: 10 }),
           new PointerActivationConstraints.Distance({ value: 5 }),
@@ -168,7 +170,7 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
         <div className="flex-1 overflow-y-auto">
           <DragDropProvider
             onDragEnd={handleOnDragEnd}
-            sensors={[sensor]}
+            sensors={[pointerSensor]}
           >
             <ul key="todo">
               {todoTasks.map((task, index) => (
@@ -228,7 +230,7 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
             <SectionDivider label="Backlog" />
             <DragDropProvider
               onDragEnd={handleOnDragEnd}
-              sensors={[sensor]}
+              sensors={[pointerSensor]}
             >
               <ul key="backlog">
                 {backlogTasks.map((task, index) => (
