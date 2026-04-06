@@ -124,7 +124,9 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
       } = operation.source
 
       if (fromIndex === toIndex) return
-      const list = fromGroupName === "todo" ? todoTasks : backlogTasks
+      const listMap: Record<string, TaskResponse[]> = { todo: todoTasks, backlog: backlogTasks, blocked: blockedTasks, snoozed: snoozedTasks }
+      const list = listMap[fromGroupName]
+      if (!list) return
       const reordered = [...list]
       const task = list[fromIndex]
       reordered.splice(fromIndex, 1)
@@ -198,35 +200,47 @@ export default function TaskListPage({ onSettings, onTaskClick, onNewTask, onNew
           {blockedTasks.length > 0 && (
             <div className="mt-4">
               <SectionDivider label="Blocked" />
-              <ul>
-                {blockedTasks.map(task => (
-                  <li key={task.id} className="flex items-start">
-                    <CheckboxRow
-                      title={task.title}
-                      completedAt={task.completedAt}
+              <DragDropProvider
+                onDragEnd={handleOnDragEnd}
+                sensors={DragDropProviderSensors}
+              >
+                <ul key="blocked">
+                  {blockedTasks.map((task, index) => (
+                    <SortableTaskRow
+                      key={task.id}
+                      id={task.id}
+                      index={index}
+                      group="blocked"
+                      task={task}
                       onCheck={() => handleCheckbox(task)}
                       onClick={() => onTaskClick(task.id)}
-                    />
-                  </li>
-                ))}
-              </ul>
+                      disabled={reorderMutation.isPending} />
+                  ))}
+                </ul>
+              </DragDropProvider>
             </div>
           )}
           {snoozedTasks.length > 0 && (
             <div className="mt-4">
               <SectionDivider label="Snoozed" />
-              <ul>
-                {snoozedTasks.map(task => (
-                  <li key={task.id} className="flex items-start">
-                    <CheckboxRow
-                      title={task.title}
-                      completedAt={task.completedAt}
+              <DragDropProvider
+                onDragEnd={handleOnDragEnd}
+                sensors={DragDropProviderSensors}
+              >
+                <ul key="snoozed">
+                  {snoozedTasks.map((task, index) => (
+                    <SortableTaskRow
+                      key={task.id}
+                      id={task.id}
+                      index={index}
+                      group="snoozed"
+                      task={task}
                       onCheck={() => handleCheckbox(task)}
                       onClick={() => onTaskClick(task.id)}
-                    />
-                  </li>
-                ))}
-              </ul>
+                      disabled={reorderMutation.isPending} />
+                  ))}
+                </ul>
+              </DragDropProvider>
             </div>
           )}
           <div className="mt-4">
