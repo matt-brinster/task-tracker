@@ -124,6 +124,8 @@ There is **no state machine** and no derived "status" field. The domain exposes 
 
 **Archive:** `archivedAt` is a timestamp on `Task`. Completed tasks stay visible in the main list until the user explicitly archives them (via bulk `POST /tasks/archive` with an array of task IDs). This avoids cache invalidation problems — completing a task doesn't remove it from the query. Archived tasks are reachable via search (`GET /tasks/search`). `reopenTask` clears both `completedAt` and `archivedAt` — reopening an archived task brings it back to the active list. The frontend uses `GET /tasks/active` (unarchived, non-deleted) as its primary list endpoint. `GET /tasks/open` (non-completed, non-deleted) is retained for now but will be removed after blocker work is done.
 
+**Icons:** Inline SVGs using [Heroicons v1 outline](https://v1.heroicons.com/) paths. No icon package installed — paths are copied directly into components. MIT licensed, no attribution required.
+
 **Blockers:** `blockers` is a `Blocker[]` — denormalized `{ id, title }` pairs stored as an array (not a set) to allow future priority ranking. On delete, blocker entries referencing the deleted task are removed from all tasks (inline fan-out). Title fan-out is deferred until a title update endpoint exists. Completion does not auto-remove blockers — the frontend resolves blocker status.
 
 The TypeScript config uses `module: "nodenext"`, so imports require explicit `.js` extensions even for `.ts` source files (e.g. `import { foo } from './foo.js'`). Each package has its own `tsconfig.json`; compiled output goes to `dist/` within the package.
