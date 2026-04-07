@@ -6,12 +6,14 @@ import { db } from './client.js'
 type UserDocument = {
   _id: string
   email: string
+  isAdmin?: boolean
 }
 
 function toDocument(user: User): UserDocument {
   return {
     _id: user.id,
     email: user.email,
+    isAdmin: user.isAdmin,
   }
 }
 
@@ -19,6 +21,7 @@ function fromDocument(doc: UserDocument): User {
   return {
     id: doc._id,
     email: doc.email,
+    isAdmin: doc.isAdmin ?? false,
   }
 }
 
@@ -39,3 +42,4 @@ export async function findUserByEmail(email: string): Promise<User | null> {
   const doc = await collection().findOne({ email })
   return doc ? fromDocument(doc) : null
 }
+
