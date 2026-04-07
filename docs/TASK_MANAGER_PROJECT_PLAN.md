@@ -293,5 +293,5 @@ Web frontend for the task manager. Single-page application — client-side routi
   - New task can get blockers too
   - Allow reordering of blockers (How without inviting fat-finger mistakes? Swipes? )
 - **UI polish** 
-  - confirm delete? Trash Icon?
-  - Different, not trashcan looking archive icon?
+  - confirm delete? Trash Icon? ✅ — using Heroicons v1 outline `trash` path
+  - Different, not trashcan looking archive icon? ✅ — using Heroicons v1 outline `arrow-down-tray` path
