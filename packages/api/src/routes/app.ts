@@ -2,9 +2,11 @@ import express from 'express'
 import type { ErrorRequestHandler } from 'express'
 import { hashToken } from '../domain/crypto.js'
 import { findSessionByTokenHash, updateLastUsedAt } from '../repository/session_repository.js'
+import { adminRouter } from './admin.js'
 import { authRouter } from './auth.js'
 import { ipLimiter, userLimiter } from './rate-limit.js'
 import { taskRouter } from './tasks.js'
+import { userRouter } from './users.js'
 
 const app = express()
 
@@ -45,6 +47,8 @@ app.use(async (req, res, next) => {
 })
 
 app.use('/tasks', userLimiter, taskRouter)
+app.use('/users', userLimiter, userRouter)
+app.use('/admin', userLimiter, adminRouter)
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error(err)

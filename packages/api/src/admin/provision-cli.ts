@@ -1,22 +1,25 @@
 import { parseArgs } from 'node:util'
 
 import { client } from '../repository/client.js'
+import { ensureIndexes } from '../repository/indexes.js'
 import { provision } from './provision.js'
 
 const { values } = parseArgs({
   options: {
     email: { type: 'string' },
+    admin: { type: 'boolean', default: false },
   },
   strict: true,
 })
 
 if (!values.email) {
-  console.error('Usage: npx tsx --env-file=.env src/admin/provision-cli.ts --email name@example.com')
+  console.error('Usage: npx tsx --env-file=.env src/admin/provision-cli.ts --email name@example.com [--admin]')
   process.exit(1)
 }
 
 try {
-  const result = await provision(values.email)
+  await ensureIndexes()
+  const result = await provision(values.email, values.admin)
   console.log(`User created:       ${result.userId}`)
   console.log(`Email:              ${result.email}`)
   console.log(`Invitation key:     ${result.rawToken}`)

@@ -58,4 +58,18 @@ describe('provision', () => {
 
     await expect(provision('  ALICE@example.com  ')).rejects.toThrow('already exists')
   })
+
+  it('creates a non-admin user by default', async () => {
+    const result = await provision('alice@example.com')
+
+    const doc = await db().collection<{ _id: string; isAdmin?: boolean }>('users').findOne({ _id: result.userId })
+    expect(doc!['isAdmin']).toBe(false)
+  })
+
+  it('creates an admin user when isAdmin is true', async () => {
+    const result = await provision('alice@example.com', true)
+
+    const doc = await db().collection<{ _id: string; isAdmin?: boolean }>('users').findOne({ _id: result.userId })
+    expect(doc!['isAdmin']).toBe(true)
+  })
 })

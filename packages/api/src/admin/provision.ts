@@ -2,7 +2,6 @@ import { createUser } from '../domain/user.js'
 import { createInvitation } from '../domain/invitation.js'
 import { insertUser, findUserByEmail } from '../repository/user_repository.js'
 import { insertInvitation } from '../repository/invitation_repository.js'
-import { ensureIndexes } from '../repository/indexes.js'
 
 export type ProvisionResult = {
   userId: string
@@ -10,15 +9,13 @@ export type ProvisionResult = {
   rawToken: string
 }
 
-export async function provision(email: string): Promise<ProvisionResult> {
+export async function provision(email: string, isAdmin = false): Promise<ProvisionResult> {
   const existing = await findUserByEmail(email.trim().toLowerCase())
   if (existing) {
     throw new Error(`User with email "${email}" already exists (id: ${existing.id})`)
   }
 
-  await ensureIndexes()
-
-  const user = createUser(email)
+  const user = createUser(email, isAdmin)
   await insertUser(user)
 
   const { invitation, rawToken } = createInvitation(user.id)
