@@ -4,6 +4,7 @@ import {
   fetchOpenTasks, fetchActiveTasks, archiveTasks, searchTasks, searchOpenTasks,
   createTask, fetchTask, updateTask, completeTask, reopenTask, deleteTask,
   setQueue, reorderTask, addBlocker, removeBlocker, snoozeTask, wakeTask,
+  fetchCurrentUser, provisionUser,
 } from './api.ts'
 import { setToken, getToken } from './auth.ts'
 
@@ -533,6 +534,79 @@ describe('wakeTask', () => {
     const [url, options] = vi.mocked(fetch).mock.calls[0]!
     expect(url).toBe('/api/tasks/task-1/wake')
     expect(options!.method).toBe('POST')
+  })
+})
+
+describe('fetchCurrentUser', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls GET /users/me and returns the user', async () => {
+    setToken('test-token')
+    const user = { id: 'u1', email: 'me@example.com', isAdmin: false }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(user), { status: 200 })
+    )
+
+    const result = await fetchCurrentUser()
+
+    expect(result).toEqual(user)
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/users/me')
+    expect(options!.method).toBeUndefined()
+  })
+
+  it('returns isAdmin: true for admin users', async () => {
+    setToken('test-token')
+    const user = { id: 'u1', email: 'admin@example.com', isAdmin: true }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(user), { status: 200 })
+    )
+
+    const result = await fetchCurrentUser()
+
+    expect(result.isAdmin).toBe(true)
+  })
+})
+
+describe('provisionUser', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('calls POST /admin/users with email and returns the result', async () => {
+    setToken('test-token')
+    const result = { userId: 'u1', email: 'new@example.com', invitationKey: 'abc123' }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(result), { status: 201 })
+    )
+
+    const response = await provisionUser('new@example.com')
+
+    expect(response).toEqual(result)
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toBe('/api/admin/users')
+    expect(options!.method).toBe('POST')
+    expect(JSON.parse(options!.body as string)).toEqual({ email: 'new@example.com' })
+  })
+
+  it('throws ApiError on 409 for duplicate email', async () => {
+    setToken('test-token')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Email already exists' }), { status: 409 })
+    )
+
+    try {
+      await provisionUser('existing@example.com')
+      expect.fail('should have thrown')
+    } catch (err) {
+      expect(err).toBeInstanceOf(ApiError)
+      expect((err as ApiError).status).toBe(409)
+      expect((err as ApiError).message).toBe('Email already exists')
+    }
   })
 })
 

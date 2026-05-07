@@ -1,5 +1,5 @@
 import { getToken, clearToken } from './auth.ts'
-import type { TaskResponse } from './types.ts'
+import type { TaskResponse, UserResponse, ProvisionUserResponse } from './types.ts'
 
 export class ApiError extends Error {
   status: number
@@ -150,6 +150,19 @@ export async function snoozeTask(id: string, until: Date): Promise<TaskResponse>
 export async function wakeTask(id: string): Promise<TaskResponse> {
   const response = await fetchApi(`/tasks/${id}/wake`, { method: 'POST' })
   return response.json() as Promise<TaskResponse>
+}
+
+export async function fetchCurrentUser(): Promise<UserResponse> {
+  const response = await fetchApi('/users/me')
+  return response.json() as Promise<UserResponse>
+}
+
+export async function provisionUser(email: string): Promise<ProvisionUserResponse> {
+  const response = await fetchApi('/admin/users', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+  return response.json() as Promise<ProvisionUserResponse>
 }
 
 export async function redeemInvitation(key: string): Promise<string> {

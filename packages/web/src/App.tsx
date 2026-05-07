@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react'
-import { getToken } from './auth.ts'
+import { useState, useEffect, useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { getToken, clearToken } from './auth.ts'
+import { fetchCurrentUser } from './api.ts'
 import LoginPage from './pages/LoginPage.tsx'
 import TaskListPage from './pages/TaskListPage.tsx'
 import TaskDetailPage from './pages/TaskDetailPage.tsx'
@@ -15,14 +17,27 @@ type View =
   | { page: 'settings' }
 
 function App() {
+  const queryClient = useQueryClient()
   const [loggedIn, setLoggedIn] = useState(() => getToken() !== null)
   const [view, setView] = useState<View>({ page: 'list' })
 
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: fetchCurrentUser,
+    enabled: loggedIn,
+  })
+
+  const handleLogout = useCallback(() => {
+    clearToken()
+    queryClient.removeQueries({ queryKey: ['currentUser'] })
+    setView({ page: 'list' })
+    setLoggedIn(false)
+  }, [queryClient])
+
   useEffect(() => {
-    const handleLogout = () => setLoggedIn(false)
     window.addEventListener('auth:logout', handleLogout)
     return () => window.removeEventListener('auth:logout', handleLogout)
-  }, [])
+  }, [handleLogout])
 
   if (!loggedIn) {
     return (
@@ -63,7 +78,8 @@ function App() {
         {view.page === 'settings' && (
           <SettingsPage
             onBack={() => setView({ page: 'list' })}
-            onLogout={() => setLoggedIn(false)}
+            onLogout={handleLogout}
+            isAdmin={currentUser?.isAdmin ?? false}
           />
         )}
       </div>
