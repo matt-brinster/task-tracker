@@ -79,4 +79,47 @@ describe('AdminSection', () => {
     await user.click(screen.getByRole('button', { name: 'Create User' }))
     expect(screen.getByLabelText('Invite key')).toHaveProperty('value', 'key2')
   })
+
+  it('copies the invite key and shows "Copied"', async () => {
+    const user = userEvent.setup()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    vi.spyOn(api, 'provisionUser').mockResolvedValue({
+      userId: 'u1',
+      email: 'new@example.com',
+      invitationKey: 'abc123',
+    })
+
+    render(<AdminSection />)
+
+    await user.type(screen.getByLabelText('New user email'), 'new@example.com')
+    await user.click(screen.getByRole('button', { name: 'Create User' }))
+
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeDefined()
+    await user.click(screen.getByRole('button', { name: 'Copy' }))
+
+    expect(writeText).toHaveBeenCalledWith('abc123')
+    expect(screen.getByRole('button', { name: 'Copied' })).toBeDefined()
+  })
+
+  it('resets the Copied indicator when a new user is created', async () => {
+    const user = userEvent.setup()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    vi.spyOn(api, 'provisionUser')
+      .mockResolvedValueOnce({ userId: 'u1', email: 'a@example.com', invitationKey: 'key1' })
+      .mockResolvedValueOnce({ userId: 'u2', email: 'b@example.com', invitationKey: 'key2' })
+
+    render(<AdminSection />)
+
+    await user.type(screen.getByLabelText('New user email'), 'a@example.com')
+    await user.click(screen.getByRole('button', { name: 'Create User' }))
+    await user.click(screen.getByRole('button', { name: 'Copy' }))
+    expect(screen.getByRole('button', { name: 'Copied' })).toBeDefined()
+
+    await user.type(screen.getByLabelText('New user email'), 'b@example.com')
+    await user.click(screen.getByRole('button', { name: 'Create User' }))
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeDefined()
+    expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull()
+  })
 })

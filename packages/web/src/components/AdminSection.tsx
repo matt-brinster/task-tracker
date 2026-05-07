@@ -6,11 +6,13 @@ export default function AdminSection() {
   const [inviteKey, setInviteKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, setIsPending] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   async function handleSubmit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
     setInviteKey(null)
+    setCopied(false)
     setIsPending(true)
     try {
       const result = await provisionUser(email.trim())
@@ -27,9 +29,10 @@ export default function AdminSection() {
     }
   }
 
-  function handleCopy() {
+  async function handleCopy() {
     if (!inviteKey) return
-    navigator.clipboard.writeText(inviteKey)
+    await navigator.clipboard.writeText(inviteKey)
+    setCopied(true)
   }
 
   return (
@@ -76,7 +79,7 @@ export default function AdminSection() {
               onClick={handleCopy}
               className="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-100 whitespace-nowrap"
             >
-              Copy
+              {copied ? 'Copied' : 'Copy'}
             </button>
           </div>
         </div>
