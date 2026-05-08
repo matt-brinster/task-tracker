@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+@.claude/CLAUDE.local.md
+
 ## Working Style
 
 We are pair programming. The user is at the keyboard; Claude is the navigator.
@@ -31,7 +33,7 @@ npm test -w web -- --run  # run tests once and exit
 
 **Provision CLI:**
 ```bash
-npx tsx --env-file=packages/api/.env src/admin/provision-cli.ts --email name@example.com
+npx tsx --env-file=packages/api/.env src/admin/provision-cli.ts --email name@example.com [--admin]
 # (run from packages/api/)
 ```
 
@@ -49,10 +51,10 @@ Completed:
 - `packages/api/src/domain/task.ts` — `Task` type (includes `sortOrder: string`), `CreateTaskOptions` type, and `createTask(userId, title, options?)` factory (uses UUIDv7 for IDs)
 - `packages/api/src/domain/task_operations.ts` — `completeTask`, `reopenTask` (clears `completedAt` and `archivedAt`), `snoozeTask`, `wakeTask`, `deleteTask`, `addBlockers`, `removeBlockers`, `setQueue`, `archiveTask`, `reorderTask`
 - `packages/api/src/domain/task_operations.test.ts` — full test coverage for all operations above (45 tests)
-- `packages/api/src/domain/user.ts` — `User` type and `createUser` factory (UUIDv7 IDs, lowercases/trims email)
+- `packages/api/src/domain/user.ts` — `User` type (includes `isAdmin: boolean`) and `createUser(email, isAdmin?)` factory (UUIDv7 IDs, lowercases/trims email, `isAdmin` defaults to `false`)
 - `packages/api/src/repository/client.ts` — MongoDB client and `db()` helper
 - `packages/api/src/repository/task_repository.ts` — `insertTask`, `updateTask(old, updated)` (throws if `deletedAt` set; inline fan-out: propagates title changes to all denormalized blocker references via `updateBlockerTitleInAll`), `softDeleteTask(old, deleted)` (replaces doc + inline blocker fan-out via `removeBlockerFromAll`), `removeBlockerFromAll(userId, blockerId)`, `updateBlockerTitleInAll(userId, blockerId, title)`, `findTaskById(userId, taskId)`, `findOpenTasks(userId, limit?)`, `findActiveTasks(userId, limit?)` (unarchived + non-deleted, includes completed), `archiveTasks(userId, taskIds, at)` (bulk sets `archivedAt`), `searchOpenTasks(userId, query, limit?)` (non-deleted, non-completed, `$text` search, sorted by text relevance), `searchAllTasks(userId, query, limit?)` (non-deleted only — includes completed and archived, sorted by text relevance), `findMaxSortOrder(userId)`, `findMinSortOrder(userId)`, document mapping (`toDocument`/`fromDocument`). Uses `task.id` as MongoDB `_id`. Queries filter out soft-deleted records by default. List queries sort by `sortOrder`; search queries sort by `textScore`. `fromDocument` uses `?? null` for `archivedAt` and `?? "a0"` for `sortOrder` to handle pre-existing documents without those fields.
-- `packages/api/src/repository/user_repository.ts` — `insertUser`, `findUserById`, `findUserByEmail`
+- `packages/api/src/repository/user_repository.ts` — `insertUser`, `findUserById`, `findUserByEmail`. `isAdmin` stored as optional field in MongoDB (`?? false` in `fromDocument` handles pre-existing docs).
 - `packages/api/src/domain/crypto.ts` — `generateToken()` (32 random bytes, base64url) and `hashToken()` (SHA-256 hex)
 - `packages/api/src/domain/invitation.ts` — `Invitation` type and `createInvitation(userId)` factory. Returns `{ invitation, rawToken }` — raw token is handed out, only the hash is stored.
 - `packages/api/src/domain/session.ts` — `Session` type and `createSession(userId)` factory. Returns `{ session, rawToken }`.
@@ -62,7 +64,7 @@ Completed:
 - `packages/api/src/repository/indexes.ts` — `ensureIndexes()`: compound indexes on tasks (`userId`, `deletedAt`, `completedAt`), (`userId`, `deletedAt`, `archivedAt`), and (`userId`, `deletedAt`, `sortOrder`), sparse multikey index on tasks (`userId`, `blockers.id`), unique index on `users.email`, text index on tasks, unique indexes on `invitations.tokenHash` and `sessions.tokenHash`
 - `packages/api/src/routes/rate-limit.ts` — `ipLimiter` (10 req/15 min, per-IP, for `/auth`) and `userLimiter` (100 req/min, per-userId, for `/tasks`). Uses `express-rate-limit` with in-memory store. Skipped in test via `NODE_ENV`.
 - `packages/api/src/routes/rate-limit.test.ts` — integration tests for both limiters (2 tests, uses `vi.mock` to override with low limits)
-- `packages/api/src/routes/app.ts` — Express app setup: JSON body parsing, request logging middleware (method, path, status, duration), rate limiting (per-IP on auth, per-user on tasks), bearer token auth middleware (hashes token → session lookup → sets `req.userId`), mounts auth routes (unauthenticated) and task routes (authenticated), global error handler (returns JSON 500). Exports `app` without calling `.listen()` (for supertest).
+- `packages/api/src/routes/app.ts` — Express app setup: JSON body parsing, request logging middleware (method, path, status, duration), rate limiting (per-IP on auth, per-user on tasks/users/admin), bearer token auth middleware (hashes token → session lookup → sets `req.userId`), mounts auth routes (unauthenticated), task routes, user routes, and admin routes (all authenticated), global error handler (returns JSON 500). Exports `app` without calling `.listen()` (for supertest).
 - `packages/api/src/routes/auth.ts` — auth routes. `POST /auth/redeem` — accepts `{ key }`, validates invitation, creates session, returns `{ token }`. Enforces 10-session-per-invitation limit.
 - `packages/api/src/routes/tasks.ts` — task routes. Response mapped via `toTaskResponse` (excludes `userId`, `deletedAt`; includes `archivedAt`, `sortOrder`). Endpoints: `GET /tasks/open`, `GET /tasks/active` (unarchived, non-deleted — includes completed), `POST /tasks/archive` (accepts `{ taskIds }`, bulk archive), `POST /tasks` (accepts optional `position: "top" | "bottom"`, default bottom), `GET /tasks/:id`, `PATCH /tasks/:id` (accepts optional `{ title, details }` for partial updates), `DELETE /tasks/:id`, `POST /tasks/:id/{complete,reopen,snooze,wake,queue,blockers,blockers/remove,reorder}`, `GET /tasks/open/search?q=...` (open tasks only), `GET /tasks/search?q=...` (all non-deleted tasks including archived/completed). `POST /tasks/:id/reorder` accepts `{ afterId, beforeId }` (nullable) and computes a new fractional sort key between the two neighbors. `POST /tasks/:id/blockers` rejects attempts to add a task as its own blocker (400).
 - `packages/api/src/routes/express.d.ts` — declaration merging to add `userId` to Express `Request`
@@ -71,9 +73,13 @@ Completed:
 - `packages/api/src/routes/auth.test.ts` — supertest integration tests for redeem endpoint and auth middleware (11 tests)
 - `packages/api/src/routes/app.test.ts` — app-level middleware tests (error handler)
 - `packages/api/src/index.ts` — entrypoint: runs `ensureIndexes()`, starts Express on `PORT` (default 3000)
-- `packages/api/src/admin/provision.ts` — `provision(email)` function: creates a user + invitation, returns `{ userId, email, rawToken }`. Throws on duplicate email.
-- `packages/api/src/admin/provision-cli.ts` — CLI wrapper: parses `--email`, calls `provision()`, prints results. Run via `npx tsx --env-file=.env src/admin/provision-cli.ts --email name@example.com` (from `packages/api/`)
-- `packages/api/src/admin/provision.test.ts` — integration tests for provisioning (6 tests)
+- `packages/api/src/admin/provision.ts` — `provision(email, isAdmin?)` function: creates a user + invitation, returns `{ userId, email, rawToken }`. Throws on duplicate email. Does not call `ensureIndexes()` — callers are responsible for infrastructure setup.
+- `packages/api/src/admin/provision-cli.ts` — CLI wrapper: parses `--email` and `--admin` flags, calls `ensureIndexes()` then `provision()`, prints results. Run via `npx tsx --env-file=.env src/admin/provision-cli.ts --email name@example.com [--admin]` (from `packages/api/`)
+- `packages/api/src/admin/provision.test.ts` — integration tests for provisioning (8 tests)
+- `packages/api/src/routes/users.ts` — user routes. `GET /users/me` returns `{ id, email, isAdmin }` for the authenticated user.
+- `packages/api/src/routes/users.test.ts` — supertest integration tests for user routes (3 tests)
+- `packages/api/src/routes/admin.ts` — admin routes. Middleware gates all routes on `isAdmin` (403 if not). `POST /admin/users` provisions a new user, returns `{ userId, email, invitationKey }` (201); 400 on missing/blank email, 409 on duplicate.
+- `packages/api/src/routes/admin.test.ts` — supertest integration tests for admin routes (7 tests)
 - `Dockerfile` — multi-stage build: deps (production `node_modules`), build (compile TS into `packages/api/dist/`), final (slim runtime image with `node packages/api/dist/index.js`)
 - `.dockerignore` — excludes `node_modules`, `dist`, `.env`, `.env.test`, `*.test.ts` from build context
 - `docker-compose.yml` — `mongodb` + `app` services. `podman compose up --build` runs the full stack.
@@ -90,8 +96,8 @@ Phase 6a (frontend scaffolding):
 
 Phase 6b (auth):
 - `packages/web/src/auth.ts` — `getToken()`, `setToken()`, `clearToken()` wrapping `localStorage`
-- `packages/web/src/api.ts` — `fetchApi(path, options)` attaches `Bearer` header; on 401, clears token and dispatches `auth:logout` custom event (no page reload). `redeemInvitation(key)` calls `POST /auth/redeem`. `fetchActiveTasks()`, `archiveTasks(taskIds)`, `searchTasks(q)` (calls `GET /tasks/search`), `updateTask(id, { title?, details? })`, `reorderTask(id, beforeId, afterId)` (calls `POST /tasks/:id/reorder`), `fetchTask(id)` returns `Promise<TaskResponse | null>` (null on 404), `addBlocker(taskId, blockerId)`, `removeBlocker(taskId, blockerId)`, plus CRUD task functions.
-- `packages/web/src/App.tsx` — conditional rendering based on auth state and current view (`list` | `detail` | `search`). Listens for `auth:logout` event to handle expired/invalid tokens gracefully.
+- `packages/web/src/api.ts` — `fetchApi(path, options)` attaches `Bearer` header; on 401, clears token and dispatches `auth:logout` custom event (no page reload). `ApiError` class (with `status`) thrown on non-2xx. `redeemInvitation(key)` calls `POST /auth/redeem`. `fetchCurrentUser()` calls `GET /users/me` and returns `{ id, email, isAdmin }`. `provisionUser(email)` calls `POST /admin/users` and returns `{ userId, email, invitationKey }`. `fetchActiveTasks()`, `archiveTasks(taskIds)`, `searchTasks(q)` (calls `GET /tasks/search`), `updateTask(id, { title?, details? })`, `reorderTask(id, beforeId, afterId)` (calls `POST /tasks/:id/reorder`), `fetchTask(id)` returns `Promise<TaskResponse | null>` (null on 404), `addBlocker(taskId, blockerId)`, `removeBlocker(taskId, blockerId)`, plus CRUD task functions.
+- `packages/web/src/App.tsx` — conditional rendering based on auth state and current view (`list` | `detail` | `search` | `settings`). Once logged in, fetches the current user via TanStack Query (`['currentUser']`, `fetchCurrentUser`) and passes `isAdmin` into `SettingsPage`. Centralized `handleLogout` clears the token, removes the `currentUser` query, resets the view, and flips `loggedIn` to false; the `auth:logout` event from `fetchApi` (on 401) calls the same handler.
 - `packages/web/src/pages/LoginPage.tsx` — invitation key form, calls `redeemInvitation`, stores token on success
 - `packages/web/src/hooks/useTaskMutations.ts` — shared hook returning `completeMutation` and `reopenMutation` (both invalidate `['tasks']` queries on success)
 - `packages/web/src/components/BackButton.tsx` — shared back button (upward chevron SVG), accepts `onClick` and optional `className`
@@ -99,10 +105,11 @@ Phase 6b (auth):
 - `packages/web/src/components/SectionDivider.tsx` — centered label with horizontal lines on each side
 - `packages/web/src/components/Loading.tsx` — centered "Loading..." state
 - `packages/web/src/components/ErrorMessage.tsx` — centered error message with configurable text
+- `packages/web/src/components/AdminSection.tsx` — admin-only Settings panel with a Create User form (calls `provisionUser`). On success, displays the returned invitation key in a read-only input with a Copy button (button label flips to "Copied" after `navigator.clipboard.writeText`; reset on next submit, no timer). Distinguishes 409 (duplicate email) from generic errors. Rendered by `SettingsPage` only when `isAdmin` is true.
 - `packages/web/src/pages/TaskListPage.tsx` — main task list, uses `fetchActiveTasks`. Top banner: search icon (left), archive icon + gear icon (right); same `px-4 py-3 border-b` header pattern as detail/search pages. Todo section: actionable tasks (todo queue, not snoozed, not blocked) with `+ Task` button. Blocked section: tasks blocked by open tasks. Snoozed section: tasks with future `snoozedUntil`. Backlog section: backlog-queue tasks (same filters) with `+ Backlog` button. All four sections wrapped in their own `DragDropProvider` (from `@dnd-kit/react`) — separate providers enforce within-group reordering only. Custom sensor config: touch uses 5px distance threshold (matching mouse) for immediate drag activation on mobile. Each task row rendered as `SortableTaskRow` (uses `useSortable` hook) with a grip handle; `handleOnDragEnd` fires `reorderTask` mutation on drop. Grip is detached during a pending reorder mutation to prevent concurrent reorders. Checkbox toggles complete/reopen. Completed tasks in both sections stay visible until archived.
 - `packages/web/src/pages/TaskDetailPage.tsx` — task detail/edit view. Unified flow for new and existing tasks: title and details are always editable with debounced autosave (`use-debounce`). New tasks created on first non-empty title; subsequent edits PATCHed. Queue toggle (segmented Todo/Backlog radio group) — for new tasks sets queue on create, for existing tasks calls `POST /tasks/:id/queue`. Delete button always visible. No explicit "Create" or "Save" button. Feature sections (blockers, snooze, queue toggle) are always visible but greyed out (`opacity-40 pointer-events-none`) until the task is saved; they become interactive once `createdId` is set.
 - `packages/web/src/pages/SearchPage.tsx` — search view. Debounced text input (`use-debounce`, 300ms); empty input shows no results. Results include all non-deleted tasks (archived and completed). Checkbox toggles complete/reopen (reopening also clears `archivedAt`). Clicking a row navigates to task detail. Archived/completed tasks dimmed.
-- `packages/web/src/pages/SettingsPage.tsx` — settings page. Same header pattern as search/detail (back button left, "Settings" title centered). Logout button in the body (clears token, calls `onLogout`).
+- `packages/web/src/pages/SettingsPage.tsx` — settings page. Same header pattern as search/detail (back button left, "Settings" title centered). Logout button calls `onLogout` (App handles token clearing). Mounts `AdminSection` below the logout when `isAdmin` is true; `isAdmin` defaults to `false` so the admin UI fails closed.
 - `packages/web/vitest.config.ts` — Vitest config with jsdom environment (no react plugin needed — vitest uses esbuild for JSX)
 - `packages/web/src/test-setup.ts` — React Testing Library cleanup between tests; stubs `ResizeObserver` (required by `@dnd-kit/react`, not provided by jsdom)
 

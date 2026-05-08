@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SettingsPage from './SettingsPage.tsx'
-import * as auth from '../auth.ts'
 
 describe('SettingsPage', () => {
   const onBack = vi.fn()
@@ -28,12 +27,22 @@ describe('SettingsPage', () => {
     expect(onBack).toHaveBeenCalled()
   })
 
-  it('clears token and calls onLogout when Logout is clicked', async () => {
+  it('calls onLogout when Logout is clicked', async () => {
     const user = userEvent.setup()
-    vi.spyOn(auth, 'clearToken')
     render(<SettingsPage onBack={onBack} onLogout={onLogout} />)
     await user.click(screen.getByText('Logout'))
-    expect(auth.clearToken).toHaveBeenCalled()
     expect(onLogout).toHaveBeenCalled()
+  })
+
+  it('does not render the admin section when isAdmin is false', () => {
+    render(<SettingsPage onBack={onBack} onLogout={onLogout} />)
+    expect(screen.queryByText('Admin')).toBeNull()
+    expect(screen.queryByLabelText('New user email')).toBeNull()
+  })
+
+  it('renders the admin section when isAdmin is true', () => {
+    render(<SettingsPage onBack={onBack} onLogout={onLogout} isAdmin={true} />)
+    expect(screen.getByText('Admin')).toBeDefined()
+    expect(screen.getByLabelText('New user email')).toBeDefined()
   })
 })
