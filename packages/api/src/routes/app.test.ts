@@ -23,7 +23,7 @@ describe('error handler', () => {
     await client.close()
 
     const res = await request(app)
-      .get('/tasks/open')
+      .get('/api/tasks/open')
       .set('Authorization', `Bearer ${token}`)
 
     expect(res.status).toBe(500)

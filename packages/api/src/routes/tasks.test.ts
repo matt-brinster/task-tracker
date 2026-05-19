@@ -37,7 +37,7 @@ function auth(token: string) {
 describe('GET /tasks/open', () => {
   it('returns an empty array when the user has no tasks', async () => {
     const res = await request(app)
-      .get('/tasks/open')
+      .get('/api/tasks/open')
       .set(...auth(token1))
 
     expect(res.status).toBe(200)
@@ -49,7 +49,7 @@ describe('GET /tasks/open', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .get('/tasks/open')
+      .get('/api/tasks/open')
       .set(...auth(token1))
 
     expect(res.status).toBe(200)
@@ -65,7 +65,7 @@ describe('GET /tasks/open', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .get('/tasks/open')
+      .get('/api/tasks/open')
       .set(...auth(token1))
 
     expect(res.body[0]).not.toHaveProperty('userId')
@@ -77,7 +77,7 @@ describe('GET /tasks/open', () => {
     await insertTask(createTask('user-2', 'Their task'))
 
     const res = await request(app)
-      .get('/tasks/open')
+      .get('/api/tasks/open')
       .set(...auth(token1))
 
     expect(res.body).toHaveLength(1)
@@ -88,7 +88,7 @@ describe('GET /tasks/open', () => {
 describe('GET /tasks/active', () => {
   it('returns an empty array when the user has no tasks', async () => {
     const res = await request(app)
-      .get('/tasks/active')
+      .get('/api/tasks/active')
       .set(...auth(token1))
 
     expect(res.status).toBe(200)
@@ -99,7 +99,7 @@ describe('GET /tasks/active', () => {
     await insertTask(createTask('user-1', 'Buy milk'))
 
     const res = await request(app)
-      .get('/tasks/active')
+      .get('/api/tasks/active')
       .set(...auth(token1))
 
     expect(res.body).toHaveLength(1)
@@ -112,7 +112,7 @@ describe('GET /tasks/active', () => {
     await insertTask(completed)
 
     const res = await request(app)
-      .get('/tasks/active')
+      .get('/api/tasks/active')
       .set(...auth(token1))
 
     expect(res.body).toHaveLength(1)
@@ -126,7 +126,7 @@ describe('GET /tasks/active', () => {
     await insertTask(archived)
 
     const res = await request(app)
-      .get('/tasks/active')
+      .get('/api/tasks/active')
       .set(...auth(token1))
 
     expect(res.body).toEqual([])
@@ -138,7 +138,7 @@ describe('GET /tasks/active', () => {
     await insertTask(deleted)
 
     const res = await request(app)
-      .get('/tasks/active')
+      .get('/api/tasks/active')
       .set(...auth(token1))
 
     expect(res.body).toEqual([])
@@ -149,7 +149,7 @@ describe('GET /tasks/active', () => {
     await insertTask(createTask('user-2', 'Their task'))
 
     const res = await request(app)
-      .get('/tasks/active')
+      .get('/api/tasks/active')
       .set(...auth(token1))
 
     expect(res.body).toHaveLength(1)
@@ -167,7 +167,7 @@ describe('POST /tasks/archive', () => {
     await insertTask(c2)
 
     const res = await request(app)
-      .post('/tasks/archive')
+      .post('/api/tasks/archive')
       .set(...auth(token1))
       .send({ taskIds: [c1.id, c2.id] })
 
@@ -181,12 +181,12 @@ describe('POST /tasks/archive', () => {
     await insertTask(completed)
 
     await request(app)
-      .post('/tasks/archive')
+      .post('/api/tasks/archive')
       .set(...auth(token1))
       .send({ taskIds: [task.id] })
 
     const res = await request(app)
-      .get('/tasks/active')
+      .get('/api/tasks/active')
       .set(...auth(token1))
 
     expect(res.body).toEqual([])
@@ -197,7 +197,7 @@ describe('POST /tasks/archive', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .post('/tasks/archive')
+      .post('/api/tasks/archive')
       .set(...auth(token1))
       .send({ taskIds: [task.id] })
 
@@ -206,7 +206,7 @@ describe('POST /tasks/archive', () => {
 
   it('ignores IDs that do not exist', async () => {
     const res = await request(app)
-      .post('/tasks/archive')
+      .post('/api/tasks/archive')
       .set(...auth(token1))
       .send({ taskIds: ['nonexistent-id'] })
 
@@ -216,7 +216,7 @@ describe('POST /tasks/archive', () => {
 
   it('returns 400 when taskIds is missing', async () => {
     const res = await request(app)
-      .post('/tasks/archive')
+      .post('/api/tasks/archive')
       .set(...auth(token1))
       .send({})
 
@@ -225,7 +225,7 @@ describe('POST /tasks/archive', () => {
 
   it('returns 400 when taskIds is empty', async () => {
     const res = await request(app)
-      .post('/tasks/archive')
+      .post('/api/tasks/archive')
       .set(...auth(token1))
       .send({ taskIds: [] })
 
@@ -239,7 +239,7 @@ describe('GET /tasks/:id', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .get(`/tasks/${task.id}`)
+      .get(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     expect(res.status).toBe(200)
@@ -250,7 +250,7 @@ describe('GET /tasks/:id', () => {
 
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
-      .get('/tasks/nonexistent-id')
+      .get('/api/tasks/nonexistent-id')
       .set(...auth(token1))
 
     expect(res.status).toBe(404)
@@ -262,7 +262,7 @@ describe('GET /tasks/:id', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .get(`/tasks/${task.id}`)
+      .get(`/api/tasks/${task.id}`)
       .set(...auth(token2))
 
     expect(res.status).toBe(404)
@@ -274,7 +274,7 @@ describe('GET /tasks/:id', () => {
     await softDeleteTask(task, deleteTask(task, new Date()))
 
     const res = await request(app)
-      .get(`/tasks/${task.id}`)
+      .get(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     expect(res.status).toBe(404)
@@ -285,7 +285,7 @@ describe('GET /tasks/:id', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .get(`/tasks/${task.id}`)
+      .get(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     expect(res.body).not.toHaveProperty('userId')
@@ -296,7 +296,7 @@ describe('GET /tasks/:id', () => {
 describe('POST /tasks', () => {
   it('creates a task with just a title', async () => {
     const res = await request(app)
-      .post('/tasks')
+      .post('/api/tasks')
       .set(...auth(token1))
       .send({ title: 'Buy milk' })
 
@@ -309,7 +309,7 @@ describe('POST /tasks', () => {
 
   it('creates a task with details and queue', async () => {
     const res = await request(app)
-      .post('/tasks')
+      .post('/api/tasks')
       .set(...auth(token1))
       .send({ title: 'Sort backlog', details: 'review priorities', queue: 'backlog' })
 
@@ -320,12 +320,12 @@ describe('POST /tasks', () => {
 
   it('persists the task to the database', async () => {
     const res = await request(app)
-      .post('/tasks')
+      .post('/api/tasks')
       .set(...auth(token1))
       .send({ title: 'Buy milk' })
 
     const getRes = await request(app)
-      .get(`/tasks/${res.body.id}`)
+      .get(`/api/tasks/${res.body.id}`)
       .set(...auth(token1))
 
     expect(getRes.status).toBe(200)
@@ -334,7 +334,7 @@ describe('POST /tasks', () => {
 
   it('trims whitespace from the title', async () => {
     const res = await request(app)
-      .post('/tasks')
+      .post('/api/tasks')
       .set(...auth(token1))
       .send({ title: '  Buy milk  ' })
 
@@ -343,7 +343,7 @@ describe('POST /tasks', () => {
 
   it('returns 400 when title is missing', async () => {
     const res = await request(app)
-      .post('/tasks')
+      .post('/api/tasks')
       .set(...auth(token1))
       .send({})
 
@@ -353,7 +353,7 @@ describe('POST /tasks', () => {
 
   it('returns 400 when title is empty', async () => {
     const res = await request(app)
-      .post('/tasks')
+      .post('/api/tasks')
       .set(...auth(token1))
       .send({ title: '   ' })
 
@@ -363,7 +363,7 @@ describe('POST /tasks', () => {
 
   it('returns 400 for invalid queue value', async () => {
     const res = await request(app)
-      .post('/tasks')
+      .post('/api/tasks')
       .set(...auth(token1))
       .send({ title: 'Buy milk', queue: 'urgent' })
 
@@ -373,7 +373,7 @@ describe('POST /tasks', () => {
 
   it('does not include userId or deletedAt in the response', async () => {
     const res = await request(app)
-      .post('/tasks')
+      .post('/api/tasks')
       .set(...auth(token1))
       .send({ title: 'Buy milk' })
 
@@ -388,7 +388,7 @@ describe('DELETE /tasks/:id', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .delete(`/tasks/${task.id}`)
+      .delete(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     expect(res.status).toBe(204)
@@ -399,11 +399,11 @@ describe('DELETE /tasks/:id', () => {
     await insertTask(task)
 
     await request(app)
-      .delete(`/tasks/${task.id}`)
+      .delete(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     const getRes = await request(app)
-      .get(`/tasks/${task.id}`)
+      .get(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     expect(getRes.status).toBe(404)
@@ -414,11 +414,11 @@ describe('DELETE /tasks/:id', () => {
     await insertTask(task)
 
     await request(app)
-      .delete(`/tasks/${task.id}`)
+      .delete(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     const listRes = await request(app)
-      .get('/tasks/open')
+      .get('/api/tasks/open')
       .set(...auth(token1))
 
     expect(listRes.body).toEqual([])
@@ -426,7 +426,7 @@ describe('DELETE /tasks/:id', () => {
 
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
-      .delete('/tasks/nonexistent-id')
+      .delete('/api/tasks/nonexistent-id')
       .set(...auth(token1))
 
     expect(res.status).toBe(404)
@@ -437,7 +437,7 @@ describe('DELETE /tasks/:id', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .delete(`/tasks/${task.id}`)
+      .delete(`/api/tasks/${task.id}`)
       .set(...auth(token2))
 
     expect(res.status).toBe(404)
@@ -451,18 +451,18 @@ describe('DELETE /tasks/:id', () => {
 
     // Add blocker via API
     await request(app)
-      .post(`/tasks/${task.id}/blockers`)
+      .post(`/api/tasks/${task.id}/blockers`)
       .set(...auth(token1))
       .send({ id: blocker.id })
 
     // Delete the blocker task
     await request(app)
-      .delete(`/tasks/${blocker.id}`)
+      .delete(`/api/tasks/${blocker.id}`)
       .set(...auth(token1))
 
     // The blocked task should have no blockers left
     const getRes = await request(app)
-      .get(`/tasks/${task.id}`)
+      .get(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     expect(getRes.body.blockers).toHaveLength(0)
@@ -478,21 +478,21 @@ describe('DELETE /tasks/:id', () => {
 
     // Add both blockers
     await request(app)
-      .post(`/tasks/${task.id}/blockers`)
+      .post(`/api/tasks/${task.id}/blockers`)
       .set(...auth(token1))
       .send({ id: blocker1.id })
     await request(app)
-      .post(`/tasks/${task.id}/blockers`)
+      .post(`/api/tasks/${task.id}/blockers`)
       .set(...auth(token1))
       .send({ id: blocker2.id })
 
     // Delete only blocker1
     await request(app)
-      .delete(`/tasks/${blocker1.id}`)
+      .delete(`/api/tasks/${blocker1.id}`)
       .set(...auth(token1))
 
     const getRes = await request(app)
-      .get(`/tasks/${task.id}`)
+      .get(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     expect(getRes.body.blockers).toHaveLength(1)
@@ -506,7 +506,7 @@ describe('PATCH /tasks/:id', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .patch(`/tasks/${task.id}`)
+      .patch(`/api/tasks/${task.id}`)
       .set(...auth(token1))
       .send({ title: 'Buy oat milk' })
 
@@ -520,7 +520,7 @@ describe('PATCH /tasks/:id', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .patch(`/tasks/${task.id}`)
+      .patch(`/api/tasks/${task.id}`)
       .set(...auth(token1))
       .send({ details: '2% milk' })
 
@@ -534,7 +534,7 @@ describe('PATCH /tasks/:id', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .patch(`/tasks/${task.id}`)
+      .patch(`/api/tasks/${task.id}`)
       .set(...auth(token1))
       .send({ title: 'Buy oat milk', details: 'from Trader Joe\'s' })
 
@@ -548,12 +548,12 @@ describe('PATCH /tasks/:id', () => {
     await insertTask(task)
 
     await request(app)
-      .patch(`/tasks/${task.id}`)
+      .patch(`/api/tasks/${task.id}`)
       .set(...auth(token1))
       .send({ title: 'Buy eggs' })
 
     const getRes = await request(app)
-      .get(`/tasks/${task.id}`)
+      .get(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     expect(getRes.body.title).toBe('Buy eggs')
@@ -561,7 +561,7 @@ describe('PATCH /tasks/:id', () => {
 
   it('returns 404 for non-existent task', async () => {
     const res = await request(app)
-      .patch('/tasks/nonexistent')
+      .patch('/api/tasks/nonexistent')
       .set(...auth(token1))
       .send({ title: 'Updated' })
 
@@ -573,7 +573,7 @@ describe('PATCH /tasks/:id', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .patch(`/tasks/${task.id}`)
+      .patch(`/api/tasks/${task.id}`)
       .set(...auth(token2))
       .send({ title: 'Stolen' })
 
@@ -585,7 +585,7 @@ describe('PATCH /tasks/:id', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .patch(`/tasks/${task.id}`)
+      .patch(`/api/tasks/${task.id}`)
       .set(...auth(token1))
       .send({ title: 123 })
 
@@ -598,7 +598,7 @@ describe('PATCH /tasks/:id', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .patch(`/tasks/${task.id}`)
+      .patch(`/api/tasks/${task.id}`)
       .set(...auth(token1))
       .send({ details: true })
 
@@ -611,7 +611,7 @@ describe('PATCH /tasks/:id', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .patch(`/tasks/${task.id}`)
+      .patch(`/api/tasks/${task.id}`)
       .set(...auth(token1))
       .send({ title: '' })
 
@@ -627,19 +627,19 @@ describe('PATCH /tasks/:id', () => {
 
     // Link blocker → dependent
     await request(app)
-      .post(`/tasks/${dependent.id}/blockers`)
+      .post(`/api/tasks/${dependent.id}/blockers`)
       .set(...auth(token1))
       .send({ id: blocker.id })
 
     // Rename the blocker task
     await request(app)
-      .patch(`/tasks/${blocker.id}`)
+      .patch(`/api/tasks/${blocker.id}`)
       .set(...auth(token1))
       .send({ title: 'New title' })
 
     // The dependent task's blocker reference should reflect the new title
     const res = await request(app)
-      .get(`/tasks/${dependent.id}`)
+      .get(`/api/tasks/${dependent.id}`)
       .set(...auth(token1))
 
     expect(res.body.blockers[0].title).toBe('New title')
@@ -652,7 +652,7 @@ describe('POST /tasks/:id/complete', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/complete`)
+      .post(`/api/tasks/${task.id}/complete`)
       .set(...auth(token1))
 
     expect(res.status).toBe(200)
@@ -665,11 +665,11 @@ describe('POST /tasks/:id/complete', () => {
     await insertTask(task)
 
     await request(app)
-      .post(`/tasks/${task.id}/complete`)
+      .post(`/api/tasks/${task.id}/complete`)
       .set(...auth(token1))
 
     const getRes = await request(app)
-      .get(`/tasks/${task.id}`)
+      .get(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     expect(getRes.body.completedAt).not.toBeNull()
@@ -680,11 +680,11 @@ describe('POST /tasks/:id/complete', () => {
     await insertTask(task)
 
     await request(app)
-      .post(`/tasks/${task.id}/complete`)
+      .post(`/api/tasks/${task.id}/complete`)
       .set(...auth(token1))
 
     const listRes = await request(app)
-      .get('/tasks/open')
+      .get('/api/tasks/open')
       .set(...auth(token1))
 
     expect(listRes.body).toEqual([])
@@ -692,7 +692,7 @@ describe('POST /tasks/:id/complete', () => {
 
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
-      .post('/tasks/nonexistent-id/complete')
+      .post('/api/tasks/nonexistent-id/complete')
       .set(...auth(token1))
 
     expect(res.status).toBe(404)
@@ -703,7 +703,7 @@ describe('POST /tasks/:id/complete', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/complete`)
+      .post(`/api/tasks/${task.id}/complete`)
       .set(...auth(token2))
 
     expect(res.status).toBe(404)
@@ -717,7 +717,7 @@ describe('POST /tasks/:id/reopen', () => {
     await updateTask(task, completeTask(task, new Date()))
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/reopen`)
+      .post(`/api/tasks/${task.id}/reopen`)
       .set(...auth(token1))
 
     expect(res.status).toBe(200)
@@ -730,11 +730,11 @@ describe('POST /tasks/:id/reopen', () => {
     await updateTask(task, completeTask(task, new Date()))
 
     await request(app)
-      .post(`/tasks/${task.id}/reopen`)
+      .post(`/api/tasks/${task.id}/reopen`)
       .set(...auth(token1))
 
     const listRes = await request(app)
-      .get('/tasks/open')
+      .get('/api/tasks/open')
       .set(...auth(token1))
 
     expect(listRes.body).toHaveLength(1)
@@ -743,7 +743,7 @@ describe('POST /tasks/:id/reopen', () => {
 
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
-      .post('/tasks/nonexistent-id/reopen')
+      .post('/api/tasks/nonexistent-id/reopen')
       .set(...auth(token1))
 
     expect(res.status).toBe(404)
@@ -756,7 +756,7 @@ describe('POST /tasks/:id/snooze', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/snooze`)
+      .post(`/api/tasks/${task.id}/snooze`)
       .set(...auth(token1))
       .send({ until: '2026-04-01T12:00:00Z' })
 
@@ -769,12 +769,12 @@ describe('POST /tasks/:id/snooze', () => {
     await insertTask(task)
 
     await request(app)
-      .post(`/tasks/${task.id}/snooze`)
+      .post(`/api/tasks/${task.id}/snooze`)
       .set(...auth(token1))
       .send({ until: '2026-04-01T12:00:00Z' })
 
     const getRes = await request(app)
-      .get(`/tasks/${task.id}`)
+      .get(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     expect(getRes.body.snoozedUntil).toBe('2026-04-01T12:00:00.000Z')
@@ -785,7 +785,7 @@ describe('POST /tasks/:id/snooze', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/snooze`)
+      .post(`/api/tasks/${task.id}/snooze`)
       .set(...auth(token1))
       .send({})
 
@@ -798,7 +798,7 @@ describe('POST /tasks/:id/snooze', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/snooze`)
+      .post(`/api/tasks/${task.id}/snooze`)
       .set(...auth(token1))
       .send({ until: 'not-a-date' })
 
@@ -808,7 +808,7 @@ describe('POST /tasks/:id/snooze', () => {
 
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
-      .post('/tasks/nonexistent-id/snooze')
+      .post('/api/tasks/nonexistent-id/snooze')
       .set(...auth(token1))
       .send({ until: '2026-04-01T12:00:00Z' })
 
@@ -823,7 +823,7 @@ describe('POST /tasks/:id/wake', () => {
     await updateTask(task, snoozeTask(task, new Date('2026-04-01T12:00:00Z')))
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/wake`)
+      .post(`/api/tasks/${task.id}/wake`)
       .set(...auth(token1))
 
     expect(res.status).toBe(200)
@@ -836,11 +836,11 @@ describe('POST /tasks/:id/wake', () => {
     await updateTask(task, snoozeTask(task, new Date('2026-04-01T12:00:00Z')))
 
     await request(app)
-      .post(`/tasks/${task.id}/wake`)
+      .post(`/api/tasks/${task.id}/wake`)
       .set(...auth(token1))
 
     const getRes = await request(app)
-      .get(`/tasks/${task.id}`)
+      .get(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     expect(getRes.body.snoozedUntil).toBeNull()
@@ -848,7 +848,7 @@ describe('POST /tasks/:id/wake', () => {
 
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
-      .post('/tasks/nonexistent-id/wake')
+      .post('/api/tasks/nonexistent-id/wake')
       .set(...auth(token1))
 
     expect(res.status).toBe(404)
@@ -858,7 +858,7 @@ describe('POST /tasks/:id/wake', () => {
 describe('GET /tasks/open/search', () => {
   it('returns 400 when q is missing', async () => {
     const res = await request(app)
-      .get('/tasks/open/search')
+      .get('/api/tasks/open/search')
       .set(...auth(token1))
 
     expect(res.status).toBe(400)
@@ -867,7 +867,7 @@ describe('GET /tasks/open/search', () => {
 
   it('returns 400 when q is empty', async () => {
     const res = await request(app)
-      .get('/tasks/open/search?q=')
+      .get('/api/tasks/open/search?q=')
       .set(...auth(token1))
 
     expect(res.status).toBe(400)
@@ -876,7 +876,7 @@ describe('GET /tasks/open/search', () => {
 
   it('returns 400 when q is only whitespace', async () => {
     const res = await request(app)
-      .get('/tasks/open/search?q=%20%20')
+      .get('/api/tasks/open/search?q=%20%20')
       .set(...auth(token1))
 
     expect(res.status).toBe(400)
@@ -888,7 +888,7 @@ describe('GET /tasks/open/search', () => {
     await insertTask(createTask('user-1', 'Fix the roof'))
 
     const res = await request(app)
-      .get('/tasks/open/search?q=groceries')
+      .get('/api/tasks/open/search?q=groceries')
       .set(...auth(token1))
 
     expect(res.status).toBe(200)
@@ -900,7 +900,7 @@ describe('GET /tasks/open/search', () => {
     await insertTask(createTask('user-1', 'Buy groceries'))
 
     const res = await request(app)
-      .get('/tasks/open/search?q=unicorn')
+      .get('/api/tasks/open/search?q=unicorn')
       .set(...auth(token1))
 
     expect(res.status).toBe(200)
@@ -912,7 +912,7 @@ describe('GET /tasks/open/search', () => {
     await insertTask(createTask('user-2', 'Buy groceries'))
 
     const res = await request(app)
-      .get('/tasks/open/search?q=groceries')
+      .get('/api/tasks/open/search?q=groceries')
       .set(...auth(token1))
 
     expect(res.body).toHaveLength(1)
@@ -924,7 +924,7 @@ describe('GET /tasks/open/search', () => {
     await softDeleteTask(task, deleteTask(task, new Date()))
 
     const res = await request(app)
-      .get('/tasks/open/search?q=groceries')
+      .get('/api/tasks/open/search?q=groceries')
       .set(...auth(token1))
 
     expect(res.body).toEqual([])
@@ -936,7 +936,7 @@ describe('GET /tasks/open/search', () => {
     await updateTask(task, completeTask(task, new Date()))
 
     const res = await request(app)
-      .get('/tasks/open/search?q=groceries')
+      .get('/api/tasks/open/search?q=groceries')
       .set(...auth(token1))
 
     expect(res.body).toEqual([])
@@ -946,7 +946,7 @@ describe('GET /tasks/open/search', () => {
     await insertTask(createTask('user-1', 'Buy groceries'))
 
     const res = await request(app)
-      .get('/tasks/open/search?q=groceries')
+      .get('/api/tasks/open/search?q=groceries')
       .set(...auth(token1))
 
     expect(res.body[0]).not.toHaveProperty('userId')
@@ -957,7 +957,7 @@ describe('GET /tasks/open/search', () => {
     await insertTask(createTask('user-1', 'Shopping', { details: 'need bananas' }))
 
     const res = await request(app)
-      .get('/tasks/open/search?q=bananas')
+      .get('/api/tasks/open/search?q=bananas')
       .set(...auth(token1))
 
     expect(res.body).toHaveLength(1)
@@ -968,7 +968,7 @@ describe('GET /tasks/open/search', () => {
 describe('GET /tasks/search', () => {
   it('returns 400 when q is missing', async () => {
     const res = await request(app)
-      .get('/tasks/search')
+      .get('/api/tasks/search')
       .set(...auth(token1))
 
     expect(res.status).toBe(400)
@@ -977,7 +977,7 @@ describe('GET /tasks/search', () => {
 
   it('returns 400 when q is empty', async () => {
     const res = await request(app)
-      .get('/tasks/search?q=')
+      .get('/api/tasks/search?q=')
       .set(...auth(token1))
 
     expect(res.status).toBe(400)
@@ -986,7 +986,7 @@ describe('GET /tasks/search', () => {
 
   it('returns 400 when q is only whitespace', async () => {
     const res = await request(app)
-      .get('/tasks/search?q=%20%20')
+      .get('/api/tasks/search?q=%20%20')
       .set(...auth(token1))
 
     expect(res.status).toBe(400)
@@ -998,7 +998,7 @@ describe('GET /tasks/search', () => {
     await insertTask(createTask('user-1', 'Fix the roof'))
 
     const res = await request(app)
-      .get('/tasks/search?q=groceries')
+      .get('/api/tasks/search?q=groceries')
       .set(...auth(token1))
 
     expect(res.status).toBe(200)
@@ -1012,7 +1012,7 @@ describe('GET /tasks/search', () => {
     await updateTask(task, completeTask(task, new Date()))
 
     const res = await request(app)
-      .get('/tasks/search?q=groceries')
+      .get('/api/tasks/search?q=groceries')
       .set(...auth(token1))
 
     expect(res.status).toBe(200)
@@ -1026,7 +1026,7 @@ describe('GET /tasks/search', () => {
     await updateTask(task, archiveTask(task, new Date()))
 
     const res = await request(app)
-      .get('/tasks/search?q=groceries')
+      .get('/api/tasks/search?q=groceries')
       .set(...auth(token1))
 
     expect(res.status).toBe(200)
@@ -1040,7 +1040,7 @@ describe('GET /tasks/search', () => {
     await softDeleteTask(task, deleteTask(task, new Date()))
 
     const res = await request(app)
-      .get('/tasks/search?q=groceries')
+      .get('/api/tasks/search?q=groceries')
       .set(...auth(token1))
 
     expect(res.body).toEqual([])
@@ -1050,7 +1050,7 @@ describe('GET /tasks/search', () => {
     await insertTask(createTask('user-1', 'Buy groceries'))
 
     const res = await request(app)
-      .get('/tasks/search?q=unicorn')
+      .get('/api/tasks/search?q=unicorn')
       .set(...auth(token1))
 
     expect(res.status).toBe(200)
@@ -1062,7 +1062,7 @@ describe('GET /tasks/search', () => {
     await insertTask(createTask('user-2', 'Buy groceries'))
 
     const res = await request(app)
-      .get('/tasks/search?q=groceries')
+      .get('/api/tasks/search?q=groceries')
       .set(...auth(token1))
 
     expect(res.body).toHaveLength(1)
@@ -1072,7 +1072,7 @@ describe('GET /tasks/search', () => {
     await insertTask(createTask('user-1', 'Buy groceries'))
 
     const res = await request(app)
-      .get('/tasks/search?q=groceries')
+      .get('/api/tasks/search?q=groceries')
       .set(...auth(token1))
 
     expect(res.body[0]).not.toHaveProperty('userId')
@@ -1083,7 +1083,7 @@ describe('GET /tasks/search', () => {
     await insertTask(createTask('user-1', 'Shopping', { details: 'need bananas' }))
 
     const res = await request(app)
-      .get('/tasks/search?q=bananas')
+      .get('/api/tasks/search?q=bananas')
       .set(...auth(token1))
 
     expect(res.body).toHaveLength(1)
@@ -1097,7 +1097,7 @@ describe('POST /tasks/:id/queue', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/queue`)
+      .post(`/api/tasks/${task.id}/queue`)
       .set(...auth(token1))
       .send({ queue: 'backlog' })
 
@@ -1110,7 +1110,7 @@ describe('POST /tasks/:id/queue', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/queue`)
+      .post(`/api/tasks/${task.id}/queue`)
       .set(...auth(token1))
       .send({ queue: 'todo' })
 
@@ -1123,12 +1123,12 @@ describe('POST /tasks/:id/queue', () => {
     await insertTask(task)
 
     await request(app)
-      .post(`/tasks/${task.id}/queue`)
+      .post(`/api/tasks/${task.id}/queue`)
       .set(...auth(token1))
       .send({ queue: 'backlog' })
 
     const getRes = await request(app)
-      .get(`/tasks/${task.id}`)
+      .get(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     expect(getRes.body.queue).toBe('backlog')
@@ -1139,7 +1139,7 @@ describe('POST /tasks/:id/queue', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/queue`)
+      .post(`/api/tasks/${task.id}/queue`)
       .set(...auth(token1))
       .send({ queue: 'urgent' })
 
@@ -1149,7 +1149,7 @@ describe('POST /tasks/:id/queue', () => {
 
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
-      .post('/tasks/nonexistent-id/queue')
+      .post('/api/tasks/nonexistent-id/queue')
       .set(...auth(token1))
       .send({ queue: 'backlog' })
 
@@ -1165,7 +1165,7 @@ describe('POST /tasks/:id/blockers', () => {
     await insertTask(blocker)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/blockers`)
+      .post(`/api/tasks/${task.id}/blockers`)
       .set(...auth(token1))
       .send({ id: blocker.id })
 
@@ -1182,7 +1182,7 @@ describe('POST /tasks/:id/blockers', () => {
     await insertTask(blocker)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/blockers`)
+      .post(`/api/tasks/${task.id}/blockers`)
       .set(...auth(token1))
       .send({ id: blocker.id })
 
@@ -1201,7 +1201,7 @@ describe('POST /tasks/:id/blockers', () => {
 
     // Try to add the same blocker via API
     const res = await request(app)
-      .post(`/tasks/${withBlocker.id}/blockers`)
+      .post(`/api/tasks/${withBlocker.id}/blockers`)
       .set(...auth(token1))
       .send({ id: blocker.id })
 
@@ -1216,12 +1216,12 @@ describe('POST /tasks/:id/blockers', () => {
     await insertTask(blocker)
 
     await request(app)
-      .post(`/tasks/${task.id}/blockers`)
+      .post(`/api/tasks/${task.id}/blockers`)
       .set(...auth(token1))
       .send({ id: blocker.id })
 
     const getRes = await request(app)
-      .get(`/tasks/${task.id}`)
+      .get(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     expect(getRes.body.blockers).toHaveLength(1)
@@ -1233,7 +1233,7 @@ describe('POST /tasks/:id/blockers', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/blockers`)
+      .post(`/api/tasks/${task.id}/blockers`)
       .set(...auth(token1))
       .send({})
 
@@ -1246,7 +1246,7 @@ describe('POST /tasks/:id/blockers', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/blockers`)
+      .post(`/api/tasks/${task.id}/blockers`)
       .set(...auth(token1))
       .send({ id: 'nonexistent-id' })
 
@@ -1261,7 +1261,7 @@ describe('POST /tasks/:id/blockers', () => {
     await insertTask(otherUserTask)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/blockers`)
+      .post(`/api/tasks/${task.id}/blockers`)
       .set(...auth(token1))
       .send({ id: otherUserTask.id })
 
@@ -1271,7 +1271,7 @@ describe('POST /tasks/:id/blockers', () => {
 
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
-      .post('/tasks/nonexistent-id/blockers')
+      .post('/api/tasks/nonexistent-id/blockers')
       .set(...auth(token1))
       .send({ id: 'some-id' })
 
@@ -1283,7 +1283,7 @@ describe('POST /tasks/:id/blockers', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/blockers`)
+      .post(`/api/tasks/${task.id}/blockers`)
       .set(...auth(token2))
       .send({ id: 'some-id' })
 
@@ -1295,7 +1295,7 @@ describe('POST /tasks/:id/blockers', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/blockers`)
+      .post(`/api/tasks/${task.id}/blockers`)
       .set(...auth(token1))
       .send({ id: task.id })
 
@@ -1315,7 +1315,7 @@ describe('POST /tasks/:id/blockers/remove', () => {
     await updateTask(task, withBlocker)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/blockers/remove`)
+      .post(`/api/tasks/${task.id}/blockers/remove`)
       .set(...auth(token1))
       .send({ id: blocker.id })
 
@@ -1331,7 +1331,7 @@ describe('POST /tasks/:id/blockers/remove', () => {
     await updateTask(task, withBlocker)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/blockers/remove`)
+      .post(`/api/tasks/${task.id}/blockers/remove`)
       .set(...auth(token1))
       .send({ id: 'nonexistent-id' })
 
@@ -1347,12 +1347,12 @@ describe('POST /tasks/:id/blockers/remove', () => {
     await updateTask(task, withBlocker)
 
     await request(app)
-      .post(`/tasks/${task.id}/blockers/remove`)
+      .post(`/api/tasks/${task.id}/blockers/remove`)
       .set(...auth(token1))
       .send({ id: blocker.id })
 
     const getRes = await request(app)
-      .get(`/tasks/${task.id}`)
+      .get(`/api/tasks/${task.id}`)
       .set(...auth(token1))
 
     expect(getRes.body.blockers).toHaveLength(0)
@@ -1363,7 +1363,7 @@ describe('POST /tasks/:id/blockers/remove', () => {
     await insertTask(task)
 
     const res = await request(app)
-      .post(`/tasks/${task.id}/blockers/remove`)
+      .post(`/api/tasks/${task.id}/blockers/remove`)
       .set(...auth(token1))
       .send({})
 
@@ -1373,7 +1373,7 @@ describe('POST /tasks/:id/blockers/remove', () => {
 
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
-      .post('/tasks/nonexistent-id/blockers/remove')
+      .post('/api/tasks/nonexistent-id/blockers/remove')
       .set(...auth(token1))
       .send({ id: 'b1' })
 
@@ -1384,7 +1384,7 @@ describe('POST /tasks/:id/blockers/remove', () => {
 describe('POST /tasks sortOrder', () => {
   it('includes sortOrder in the response', async () => {
     const res = await request(app)
-      .post('/tasks')
+      .post('/api/tasks')
       .set(...auth(token1))
       .send({ title: 'First task' })
 
@@ -1394,17 +1394,17 @@ describe('POST /tasks sortOrder', () => {
 
   it('assigns increasing sortOrder to successive tasks', async () => {
     const res1 = await request(app)
-      .post('/tasks')
+      .post('/api/tasks')
       .set(...auth(token1))
       .send({ title: 'First' })
 
     const res2 = await request(app)
-      .post('/tasks')
+      .post('/api/tasks')
       .set(...auth(token1))
       .send({ title: 'Second' })
 
     const res3 = await request(app)
-      .post('/tasks')
+      .post('/api/tasks')
       .set(...auth(token1))
       .send({ title: 'Third' })
 
@@ -1413,30 +1413,30 @@ describe('POST /tasks sortOrder', () => {
   })
 
   it('returns tasks sorted by sortOrder', async () => {
-    await request(app).post('/tasks').set(...auth(token1)).send({ title: 'First' })
-    await request(app).post('/tasks').set(...auth(token1)).send({ title: 'Second' })
-    await request(app).post('/tasks').set(...auth(token1)).send({ title: 'Third' })
+    await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'First' })
+    await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'Second' })
+    await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'Third' })
 
     const res = await request(app)
-      .get('/tasks/active')
+      .get('/api/tasks/active')
       .set(...auth(token1))
 
     expect(res.body.map((t: { title: string }) => t.title)).toEqual(['First', 'Second', 'Third'])
   })
 
   it('places a task at the top when position is "top"', async () => {
-    await request(app).post('/tasks').set(...auth(token1)).send({ title: 'First' })
-    await request(app).post('/tasks').set(...auth(token1)).send({ title: 'Second' })
+    await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'First' })
+    await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'Second' })
 
-    await request(app).post('/tasks').set(...auth(token1))
+    await request(app).post('/api/tasks').set(...auth(token1))
       .send({ title: 'Top task', position: 'top' })
 
-    const list = await request(app).get('/tasks/active').set(...auth(token1))
+    const list = await request(app).get('/api/tasks/active').set(...auth(token1))
     expect(list.body.map((t: { title: string }) => t.title)).toEqual(['Top task', 'First', 'Second'])
   })
 
   it('returns 400 for invalid position', async () => {
-    const res = await request(app).post('/tasks').set(...auth(token1))
+    const res = await request(app).post('/api/tasks').set(...auth(token1))
       .send({ title: 'Bad', position: 'middle' })
 
     expect(res.status).toBe(400)
@@ -1444,8 +1444,8 @@ describe('POST /tasks sortOrder', () => {
   })
 
   it('assigns sortOrder independently per user', async () => {
-    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'User1 task' })
-    const r2 = await request(app).post('/tasks').set(...auth(token2)).send({ title: 'User2 task' })
+    const r1 = await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'User1 task' })
+    const r2 = await request(app).post('/api/tasks').set(...auth(token2)).send({ title: 'User2 task' })
 
     // Both users' first task should get the same sortOrder (both start from empty)
     expect(r1.body.sortOrder).toBe(r2.body.sortOrder)
@@ -1454,13 +1454,13 @@ describe('POST /tasks sortOrder', () => {
 
 describe('POST /tasks/:id/reorder', () => {
   it('moves a task between two others', async () => {
-    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'A' })
-    const r2 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'B' })
-    const r3 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'C' })
+    const r1 = await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'A' })
+    const r2 = await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'B' })
+    const r3 = await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'C' })
 
     // Move C between A and B
     const res = await request(app)
-      .post(`/tasks/${r3.body.id}/reorder`)
+      .post(`/api/tasks/${r3.body.id}/reorder`)
       .set(...auth(token1))
       .send({ afterId: r1.body.id, beforeId: r2.body.id })
 
@@ -1469,51 +1469,51 @@ describe('POST /tasks/:id/reorder', () => {
     expect(res.body.sortOrder < r2.body.sortOrder).toBe(true)
 
     // Verify list order is now A, C, B
-    const list = await request(app).get('/tasks/active').set(...auth(token1))
+    const list = await request(app).get('/api/tasks/active').set(...auth(token1))
     expect(list.body.map((t: { title: string }) => t.title)).toEqual(['A', 'C', 'B'])
   })
 
   it('moves a task to the top (afterId null)', async () => {
-    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'A' })
-    await request(app).post('/tasks').set(...auth(token1)).send({ title: 'B' })
-    const r3 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'C' })
+    const r1 = await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'A' })
+    await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'B' })
+    const r3 = await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'C' })
 
     // Move C to the top
     const res = await request(app)
-      .post(`/tasks/${r3.body.id}/reorder`)
+      .post(`/api/tasks/${r3.body.id}/reorder`)
       .set(...auth(token1))
       .send({ afterId: null, beforeId: r1.body.id })
 
     expect(res.status).toBe(200)
     expect(res.body.sortOrder < r1.body.sortOrder).toBe(true)
 
-    const list = await request(app).get('/tasks/active').set(...auth(token1))
+    const list = await request(app).get('/api/tasks/active').set(...auth(token1))
     expect(list.body.map((t: { title: string }) => t.title)).toEqual(['C', 'A', 'B'])
   })
 
   it('moves a task to the bottom (beforeId null)', async () => {
-    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'A' })
-    await request(app).post('/tasks').set(...auth(token1)).send({ title: 'B' })
-    const r3 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'C' })
+    const r1 = await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'A' })
+    await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'B' })
+    const r3 = await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'C' })
 
     // Move A to the bottom
     const res = await request(app)
-      .post(`/tasks/${r1.body.id}/reorder`)
+      .post(`/api/tasks/${r1.body.id}/reorder`)
       .set(...auth(token1))
       .send({ afterId: r3.body.id, beforeId: null })
 
     expect(res.status).toBe(200)
     expect(res.body.sortOrder > r3.body.sortOrder).toBe(true)
 
-    const list = await request(app).get('/tasks/active').set(...auth(token1))
+    const list = await request(app).get('/api/tasks/active').set(...auth(token1))
     expect(list.body.map((t: { title: string }) => t.title)).toEqual(['B', 'C', 'A'])
   })
 
   it('preserves sortOrder when changing queue', async () => {
-    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'A' })
+    const r1 = await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'A' })
 
     const queueRes = await request(app)
-      .post(`/tasks/${r1.body.id}/queue`)
+      .post(`/api/tasks/${r1.body.id}/queue`)
       .set(...auth(token1))
       .send({ queue: 'backlog' })
 
@@ -1522,7 +1522,7 @@ describe('POST /tasks/:id/reorder', () => {
 
   it('returns 404 when the task does not exist', async () => {
     const res = await request(app)
-      .post('/tasks/nonexistent-id/reorder')
+      .post('/api/tasks/nonexistent-id/reorder')
       .set(...auth(token1))
       .send({ afterId: null, beforeId: null })
 
@@ -1531,10 +1531,10 @@ describe('POST /tasks/:id/reorder', () => {
   })
 
   it('returns 404 when afterId task does not exist', async () => {
-    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'A' })
+    const r1 = await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'A' })
 
     const res = await request(app)
-      .post(`/tasks/${r1.body.id}/reorder`)
+      .post(`/api/tasks/${r1.body.id}/reorder`)
       .set(...auth(token1))
       .send({ afterId: 'nonexistent', beforeId: null })
 
@@ -1543,10 +1543,10 @@ describe('POST /tasks/:id/reorder', () => {
   })
 
   it('returns 404 when beforeId task does not exist', async () => {
-    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'A' })
+    const r1 = await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'A' })
 
     const res = await request(app)
-      .post(`/tasks/${r1.body.id}/reorder`)
+      .post(`/api/tasks/${r1.body.id}/reorder`)
       .set(...auth(token1))
       .send({ afterId: null, beforeId: 'nonexistent' })
 
@@ -1555,12 +1555,12 @@ describe('POST /tasks/:id/reorder', () => {
   })
 
   it('returns 400 when afterId sorts after beforeId', async () => {
-    const r1 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'A' })
-    const r2 = await request(app).post('/tasks').set(...auth(token1)).send({ title: 'B' })
+    const r1 = await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'A' })
+    const r2 = await request(app).post('/api/tasks').set(...auth(token1)).send({ title: 'B' })
 
     // Pass them in wrong order: afterId has higher sortOrder than beforeId
     const res = await request(app)
-      .post(`/tasks/${r1.body.id}/reorder`)
+      .post(`/api/tasks/${r1.body.id}/reorder`)
       .set(...auth(token1))
       .send({ afterId: r2.body.id, beforeId: r1.body.id })
 
@@ -1569,10 +1569,10 @@ describe('POST /tasks/:id/reorder', () => {
   })
 
   it('does not allow reordering another user\'s task', async () => {
-    const r1 = await request(app).post('/tasks').set(...auth(token2)).send({ title: 'Their task' })
+    const r1 = await request(app).post('/api/tasks').set(...auth(token2)).send({ title: 'Their task' })
 
     const res = await request(app)
-      .post(`/tasks/${r1.body.id}/reorder`)
+      .post(`/api/tasks/${r1.body.id}/reorder`)
       .set(...auth(token1))
       .send({ afterId: null, beforeId: null })
 

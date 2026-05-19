@@ -21,11 +21,16 @@ app.use((req, res, next) => {
   next()
 })
 
+// All API routes live under /api so the prod container (Express serving both
+// the SPA and the API on one origin) and dev (Vite proxy, no rewrite) share
+// identical paths. The browser always calls /api/*.
+const api = express.Router()
+
 // Auth routes are unauthenticated (you need them to get a token)
-app.use('/auth', ipLimiter, authRouter)
+api.use('/auth', ipLimiter, authRouter)
 
 // Bearer token auth middleware
-app.use(async (req, res, next) => {
+api.use(async (req, res, next) => {
   const header = req.headers.authorization
   if (typeof header !== 'string' || !header.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Missing or invalid Authorization header' })
@@ -46,9 +51,11 @@ app.use(async (req, res, next) => {
   next()
 })
 
-app.use('/tasks', userLimiter, taskRouter)
-app.use('/users', userLimiter, userRouter)
-app.use('/admin', userLimiter, adminRouter)
+api.use('/tasks', userLimiter, taskRouter)
+api.use('/users', userLimiter, userRouter)
+api.use('/admin', userLimiter, adminRouter)
+
+app.use('/api', api)
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error(err)

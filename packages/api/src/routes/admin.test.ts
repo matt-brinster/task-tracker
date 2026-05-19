@@ -41,7 +41,7 @@ describe('admin middleware', () => {
     const { token } = await createRegularSession()
 
     const res = await request(app)
-      .post('/admin/users')
+      .post('/api/admin/users')
       .set('Authorization', `Bearer ${token}`)
       .send({ email: 'new@example.com' })
 
@@ -51,7 +51,7 @@ describe('admin middleware', () => {
 
   it('returns 401 without a bearer token', async () => {
     const res = await request(app)
-      .post('/admin/users')
+      .post('/api/admin/users')
       .send({ email: 'new@example.com' })
 
     expect(res.status).toBe(401)
@@ -63,7 +63,7 @@ describe('POST /admin/users', () => {
     const { token } = await createAdminSession()
 
     const res = await request(app)
-      .post('/admin/users')
+      .post('/api/admin/users')
       .set('Authorization', `Bearer ${token}`)
       .send({ email: 'new@example.com' })
 
@@ -78,7 +78,7 @@ describe('POST /admin/users', () => {
     const { token } = await createAdminSession()
 
     const res = await request(app)
-      .post('/admin/users')
+      .post('/api/admin/users')
       .set('Authorization', `Bearer ${token}`)
       .send({ email: 'new@example.com' })
 
@@ -91,7 +91,7 @@ describe('POST /admin/users', () => {
     const { token } = await createAdminSession()
 
     const res = await request(app)
-      .post('/admin/users')
+      .post('/api/admin/users')
       .set('Authorization', `Bearer ${token}`)
       .send({ email: 'new@example.com' })
 
@@ -103,7 +103,7 @@ describe('POST /admin/users', () => {
     const { token } = await createAdminSession()
 
     const res = await request(app)
-      .post('/admin/users')
+      .post('/api/admin/users')
       .set('Authorization', `Bearer ${token}`)
       .send({})
 
@@ -115,7 +115,7 @@ describe('POST /admin/users', () => {
     const { token } = await createAdminSession()
 
     const res = await request(app)
-      .post('/admin/users')
+      .post('/api/admin/users')
       .set('Authorization', `Bearer ${token}`)
       .send({ email: '   ' })
 
@@ -126,12 +126,12 @@ describe('POST /admin/users', () => {
   it('returns 409 when email already exists', async () => {
     const { token } = await createAdminSession()
     await request(app)
-      .post('/admin/users')
+      .post('/api/admin/users')
       .set('Authorization', `Bearer ${token}`)
       .send({ email: 'new@example.com' })
 
     const res = await request(app)
-      .post('/admin/users')
+      .post('/api/admin/users')
       .set('Authorization', `Bearer ${token}`)
       .send({ email: 'new@example.com' })
 

@@ -28,7 +28,7 @@ describe('GET /users/me', () => {
     const token = await createTestSession(user.id)
 
     const res = await request(app)
-      .get('/users/me')
+      .get('/api/users/me')
       .set('Authorization', `Bearer ${token}`)
 
     expect(res.status).toBe(200)
@@ -43,7 +43,7 @@ describe('GET /users/me', () => {
     const token = await createTestSession(user.id)
 
     const res = await request(app)
-      .get('/users/me')
+      .get('/api/users/me')
       .set('Authorization', `Bearer ${token}`)
 
     expect(res.status).toBe(200)
@@ -51,7 +51,7 @@ describe('GET /users/me', () => {
   })
 
   it('returns 401 without a bearer token', async () => {
-    const res = await request(app).get('/users/me')
+    const res = await request(app).get('/api/users/me')
 
     expect(res.status).toBe(401)
   })
