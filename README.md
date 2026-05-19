@@ -27,8 +27,7 @@ docker compose up -d mongodb
 Start the API (port 3000):
 
 ```bash
-npm run build -w api
-node packages/api/dist/index.js
+npm run dev -w api
 ```
 
 Or run the API and MongoDB in Docker:

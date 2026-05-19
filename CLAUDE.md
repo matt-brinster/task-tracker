@@ -29,7 +29,7 @@ npm test -w web           # run tests (Vitest, watch mode)
 npm test -w web -- --run  # run tests once and exit
 ```
 
-**Test framework: Vitest.** Tests load `packages/api/.env.test` via `node --env-file=.env.test`. Copy `packages/api/.env.test.example` to `packages/api/.env.test` to get started. Integration tests require MongoDB running (`podman compose up -d`).
+**Test framework: Vitest.** Tests load `packages/api/.env.test` via `node --env-file=.env.test`. Copy `packages/api/.env.test.example` to `packages/api/.env.test` to get started. Integration tests require MongoDB running (`podman compose up -d mongodb` — naming the service starts only the database, not the `app` container).
 
 **Provision CLI:**
 ```bash
