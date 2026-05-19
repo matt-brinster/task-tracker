@@ -1,19 +1,21 @@
 import { MongoClient } from 'mongodb'
+import { databaseName } from './mongo-uri.js'
 
-const username = process.env['MONGO_USERNAME']
-const password = process.env['MONGO_PASSWORD']
-const host     = process.env['MONGO_HOST'] ?? 'localhost'
-const port     = process.env['MONGO_PORT'] ?? '27017'
-const database = process.env['MONGO_DATABASE']
-
-if (!username || !password || !database) {
-  throw new Error('MONGO_USERNAME, MONGO_PASSWORD, and MONGO_DATABASE must be set')
+const uri = process.env['MONGO_URI']
+if (!uri) {
+  throw new Error('MONGO_URI must be set')
 }
 
-const uri = `mongodb://${username}:${password}@${host}:${port}/${database}?authSource=admin`
+if (!databaseName(uri)) {
+  throw new Error(
+    'MONGO_URI must include a database name in the path, e.g. ' +
+      'mongodb+srv://user:pass@cluster.mongodb.net/taskmanager. ' +
+      'Atlas connection strings omit it by default — add one to the path.',
+  )
+}
 
 export const client = new MongoClient(uri)
 
 export function db() {
-  return client.db(database)
+  return client.db()
 }
