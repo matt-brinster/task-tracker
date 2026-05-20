@@ -45,7 +45,7 @@ npx tsx --env-file=packages/api/.env src/admin/provision-cli.ts --email name@exa
 **Phase 4: Blocker Fan-out on Delete** — complete.
 **Phase 5: Local Deployment** — complete.
 **Phase 5.5: Monorepo Restructure** — complete.
-**Phase 6: Frontend** — in progress (6a–6c complete, search complete, backlog complete, banner/navigation complete, blockers complete, snooze detail page complete; remaining features are independent: snooze task list section, deploy).
+**Phase 6: Frontend** — in progress (6a–6c complete, search complete, backlog complete, banner/navigation complete, blockers complete, snooze detail page complete; deploy in progress — API-side prod-readiness complete (`/api` prefix unification, `/healthz`, `trust proxy`, `express.static` SPA serving), remaining: Dockerfile frontend build stage and full-stack `podman compose up --build` verify; one feature still independent: snooze task list section).
 
 Completed:
 - `packages/api/src/domain/task.ts` — `Task` type (includes `sortOrder: string`), `CreateTaskOptions` type, and `createTask(userId, title, options?)` factory (uses UUIDv7 for IDs)
@@ -64,7 +64,7 @@ Completed:
 - `packages/api/src/repository/indexes.ts` — `ensureIndexes()`: compound indexes on tasks (`userId`, `deletedAt`, `completedAt`), (`userId`, `deletedAt`, `archivedAt`), and (`userId`, `deletedAt`, `sortOrder`), sparse multikey index on tasks (`userId`, `blockers.id`), unique index on `users.email`, text index on tasks, unique indexes on `invitations.tokenHash` and `sessions.tokenHash`
 - `packages/api/src/routes/rate-limit.ts` — `ipLimiter` (10 req/15 min, per-IP, for `/auth`) and `userLimiter` (100 req/min, per-userId, for `/tasks`). Uses `express-rate-limit` with in-memory store. Skipped in test via `NODE_ENV`.
 - `packages/api/src/routes/rate-limit.test.ts` — integration tests for both limiters (2 tests, uses `vi.mock` to override with low limits)
-- `packages/api/src/routes/app.ts` — Express app setup: JSON body parsing, request logging middleware (method, path, status, duration), rate limiting (per-IP on auth, per-user on tasks/users/admin), bearer token auth middleware (hashes token → session lookup → sets `req.userId`), mounts auth routes (unauthenticated), task routes, user routes, and admin routes (all authenticated), global error handler (returns JSON 500). Exports `app` without calling `.listen()` (for supertest).
+- `packages/api/src/routes/app.ts` — Express app setup. `trust proxy` configurable via `TRUST_PROXY_HOPS` env (default 1); `/healthz` liveness endpoint (200 JSON, unauthenticated, before the request logger so health pings don't flood logs); JSON body parsing; request logging middleware (method, path, status, duration); all API routes mounted under `/api` (so dev — Vite proxy — and prod — single origin — share identical paths): per-IP rate limit on `/api/auth`, per-user rate limit on `/api/tasks|users|admin`, bearer token auth middleware (hashes token → session lookup → sets `req.userId`) gates everything except `/api/auth`; `express.static(webDistDir)` serves the built SPA at the end (minimal — no history fallback, app has no client routing); global error handler (returns JSON 500). `webDistDir` resolves from `WEB_DIST_DIR` env, defaulting to a module-relative path via `fileURLToPath(import.meta.url)`. Exports `app` without calling `.listen()` (for supertest).
 - `packages/api/src/routes/auth.ts` — auth routes. `POST /auth/redeem` — accepts `{ key }`, validates invitation, creates session, returns `{ token }`. Enforces 10-session-per-invitation limit.
 - `packages/api/src/routes/tasks.ts` — task routes. Response mapped via `toTaskResponse` (excludes `userId`, `deletedAt`; includes `archivedAt`, `sortOrder`). Endpoints: `GET /tasks/open`, `GET /tasks/active` (unarchived, non-deleted — includes completed), `POST /tasks/archive` (accepts `{ taskIds }`, bulk archive), `POST /tasks` (accepts optional `position: "top" | "bottom"`, default bottom), `GET /tasks/:id`, `PATCH /tasks/:id` (accepts optional `{ title, details }` for partial updates), `DELETE /tasks/:id`, `POST /tasks/:id/{complete,reopen,snooze,wake,queue,blockers,blockers/remove,reorder}`, `GET /tasks/open/search?q=...` (open tasks only), `GET /tasks/search?q=...` (all non-deleted tasks including archived/completed). `POST /tasks/:id/reorder` accepts `{ afterId, beforeId }` (nullable) and computes a new fractional sort key between the two neighbors. `POST /tasks/:id/blockers` rejects attempts to add a task as its own blocker (400).
 - `packages/api/src/routes/express.d.ts` — declaration merging to add `userId` to Express `Request`
@@ -87,7 +87,7 @@ Completed:
 
 Phase 6a (frontend scaffolding):
 - `packages/web/` — Vite + React + TypeScript scaffold
-- `packages/web/vite.config.ts` — Vite config with `@tailwindcss/vite` plugin and dev proxy (`/api` → `http://localhost:3000`)
+- `packages/web/vite.config.ts` — Vite config with `@tailwindcss/vite` plugin and dev proxy (`/api` → `http://localhost:3000`, no rewrite — paths preserved so dev and prod are identical)
 - `packages/web/src/index.css` — Tailwind CSS v4 via `@import "tailwindcss"`
 - `packages/web/src/App.tsx` — placeholder hello world with Tailwind classes
 - `packages/web/src/main.tsx` — React entrypoint, renders `<App />` into `#root`
