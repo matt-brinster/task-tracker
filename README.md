@@ -56,12 +56,20 @@ Drop the `-- --run` to start in watch mode.
 
 ## Provisioning a user
 
+From the host (against locally-run API + MongoDB):
+
 ```bash
 cd packages/api
 npx tsx --env-file=.env src/admin/provision-cli.ts --email name@example.com
 ```
 
-This creates a user and prints an invitation key. Enter the key on the login page to create a session.
+Or from inside the running app container (when using `docker compose up`):
+
+```bash
+docker compose exec app node packages/api/dist/admin/provision-cli.js --email name@example.com
+```
+
+Either form creates a user and prints an invitation key. Enter the key on the login page to create a session.
 
 ## Stopping
 

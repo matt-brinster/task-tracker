@@ -45,7 +45,7 @@ npx tsx --env-file=packages/api/.env src/admin/provision-cli.ts --email name@exa
 **Phase 4: Blocker Fan-out on Delete** — complete.
 **Phase 5: Local Deployment** — complete.
 **Phase 5.5: Monorepo Restructure** — complete.
-**Phase 6: Frontend** — in progress (6a–6c complete, search complete, backlog complete, banner/navigation complete, blockers complete, snooze detail page complete; deploy in progress — API-side prod-readiness complete (`/api` prefix unification, `/healthz`, `trust proxy`, `express.static` SPA serving), remaining: Dockerfile frontend build stage and full-stack `podman compose up --build` verify; one feature still independent: snooze task list section).
+**Phase 6: Frontend** — in progress (6a–6c complete, search complete, backlog complete, banner/navigation complete, blockers complete, snooze detail page complete; deploy in progress — API-side prod-readiness complete (`/api` prefix unification, `/healthz`, `trust proxy`, `express.static` SPA serving); Dockerfile frontend build stage complete (`build-web` stage emits `packages/web/dist/`, copied into final image; `ENV WEB_DIST_DIR=/app/packages/web/dist` set explicitly); full-stack `podman compose up --build` verified end-to-end (healthz, SPA, login + task CRUD); remaining: env var hygiene, Atlas IP allowlist for Koyeb egress; one feature still independent: snooze task list section).
 
 Completed:
 - `packages/api/src/domain/task.ts` — `Task` type (includes `sortOrder: string`), `CreateTaskOptions` type, and `createTask(userId, title, options?)` factory (uses UUIDv7 for IDs)
@@ -80,7 +80,7 @@ Completed:
 - `packages/api/src/routes/users.test.ts` — supertest integration tests for user routes (3 tests)
 - `packages/api/src/routes/admin.ts` — admin routes. Middleware gates all routes on `isAdmin` (403 if not). `POST /admin/users` provisions a new user, returns `{ userId, email, invitationKey }` (201); 400 on missing/blank email, 409 on duplicate.
 - `packages/api/src/routes/admin.test.ts` — supertest integration tests for admin routes (7 tests)
-- `Dockerfile` — multi-stage build: deps (production `node_modules`), build (compile TS into `packages/api/dist/`), final (slim runtime image with `node packages/api/dist/index.js`)
+- `Dockerfile` — multi-stage build: `deps` (production `node_modules`), `build-api` (compile TS into `packages/api/dist/`), `build-web` (`tsc` + `vite build` into `packages/web/dist/`), final (slim runtime image with `node packages/api/dist/index.js`). Final stage copies api dist, web dist, and prod node_modules; sets `ENV WEB_DIST_DIR=/app/packages/web/dist` so [app.ts](packages/api/src/routes/app.ts) reads an explicit path rather than the module-relative default.
 - `.dockerignore` — excludes `node_modules`, `dist`, `.env`, `.env.test`, `*.test.ts` from build context
 - `docker-compose.yml` — `mongodb` + `app` services. `podman compose up --build` runs the full stack.
 - `.gitattributes` — normalizes line endings to LF in the repo (fixes CRLF/LF issues between Windows and WSL)
