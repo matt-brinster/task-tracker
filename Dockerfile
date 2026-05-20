@@ -31,6 +31,7 @@ COPY --from=build-api /app/packages/api/dist ./packages/api/dist/
 COPY --from=build-web /app/packages/web/dist ./packages/web/dist/
 COPY package.json ./
 COPY packages/api/package.json ./packages/api/
+ENV NODE_ENV=production
 ENV WEB_DIST_DIR=/app/packages/web/dist
 EXPOSE 3000
 CMD ["node", "packages/api/dist/index.js"]
