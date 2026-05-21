@@ -27,13 +27,14 @@ MongoDB Atlas requires an IP allowlist before any client can connect. The app's 
 
 - If your host advertises **static egress IPs**, add them as individual entries.
 - If the host advertises a **CIDR range**, add the range.
-- If the host has **no published static egress** (common on free tiers), the practical options are: allow `0.0.0.0/0` (any IP can attempt a connection — defense then rests entirely on the Atlas database user's credentials and the cluster's TLS), or move to a tier that supports private networking (Atlas VPC peering / Private Endpoint).
+- If the host advertises **shared egress IPs** (common on free tiers — e.g. Render free publishes two shared outbound IPs that all free-tier services route through), allowlist those individual IPs. Strictly better than `0.0.0.0/0`: the IP set is a small subset of the internet (other free-tier tenants of the same host, not arbitrary scanners). Caveat: free-tier egress IPs can rotate without notice, so a future mystery connection failure is worth checking the allowlist for first. Defense at the credential layer (DB user password + TLS) is unchanged either way — the IP allowlist is a network-layer narrowing, not a trust boundary.
+- If the host has **no published egress IPs at all**, the practical options are: allow `0.0.0.0/0` (any IP can attempt a connection — defense then rests entirely on the Atlas database user's credentials and the cluster's TLS), or move to a tier that supports private networking (Atlas VPC peering / Private Endpoint). This hasn't been tested.
 
 Whichever route, the cluster also needs a database user with read/write on the application database — that user's credentials go into the `MONGO_URI` above.
 
 ## First-admin provisioning
 
-A fresh deploy has no users. Create the first admin by running the provision CLI **inside the running app container** (the production image already contains the compiled CLI at `packages/api/dist/admin/provision-cli.js`):
+A fresh deploy has no users. The preferred path is to run the provision CLI **inside the running app container** (the production image already contains the compiled CLI at `packages/api/dist/admin/provision-cli.js`):
 
 ```bash
 # Generic — replace with your platform's "exec into a running instance" command
@@ -43,6 +44,15 @@ A fresh deploy has no users. Create the first admin by running the provision CLI
 The CLI prints an invitation key. Enter it on the login page to create a session. From there, additional users can be provisioned through the in-app admin UI (Settings → Create User).
 
 The provision CLI also runs `ensureIndexes()`, which creates the required MongoDB indexes if they don't exist. Subsequent app startups run `ensureIndexes()` too, so no separate "migration" step is needed.
+
+### Hosts without shell/SSH access
+
+Some hosts (notably **Render free**) don't provide shell access to the running container, so the `<exec-into-container>` step above isn't available. Two stopgap options today:
+
+1. **Run the provision CLI locally against the prod `MONGO_URI`.** Temporarily point a local `.env` at the production Atlas connection string and run `npx tsx --env-file=.env src/admin/provision-cli.ts --email you@example.com --admin` from `packages/api/`. Requires adding your dev IP to the Atlas allowlist for the duration, then removing it. Zero new code.
+2. **Write the invitation document directly into Atlas** (data browser → `invitations` collection). Works but skips the domain factory and is awkward to repeat — fine for a one-off first-admin seed when you don't want to touch the allowlist.
+
+A proper fix — an env-var-driven bootstrap that provisions an admin on startup when the DB is empty — is tracked under "Bootstrap admin (no-shell host)" in [TASK_MANAGER_PROJECT_PLAN.md](TASK_MANAGER_PROJECT_PLAN.md).
 
 ## Health check
 
