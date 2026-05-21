@@ -26,7 +26,7 @@ describe('POST /auth/redeem', () => {
     await insertInvitation(invitation)
 
     const res = await request(app)
-      .post('/auth/redeem')
+      .post('/api/auth/redeem')
       .send({ key: rawToken })
 
     expect(res.status).toBe(201)
@@ -39,14 +39,14 @@ describe('POST /auth/redeem', () => {
     await insertInvitation(invitation)
 
     const redeemRes = await request(app)
-      .post('/auth/redeem')
+      .post('/api/auth/redeem')
       .send({ key: rawToken })
 
     const bearerToken = redeemRes.body.token
 
     // Use the bearer token to access a protected route
     const taskRes = await request(app)
-      .get('/tasks/open')
+      .get('/api/tasks/open')
       .set('Authorization', `Bearer ${bearerToken}`)
 
     expect(taskRes.status).toBe(200)
@@ -57,11 +57,11 @@ describe('POST /auth/redeem', () => {
     await insertInvitation(invitation)
 
     const res1 = await request(app)
-      .post('/auth/redeem')
+      .post('/api/auth/redeem')
       .send({ key: rawToken })
 
     const res2 = await request(app)
-      .post('/auth/redeem')
+      .post('/api/auth/redeem')
       .send({ key: rawToken })
 
     expect(res1.status).toBe(201)
@@ -77,7 +77,7 @@ describe('POST /auth/redeem', () => {
     await insertInvitation(invitation)
 
     const res = await request(app)
-      .post('/auth/redeem')
+      .post('/api/auth/redeem')
       .send({ key: rawToken })
 
     expect(res.status).toBe(403)
@@ -86,7 +86,7 @@ describe('POST /auth/redeem', () => {
 
   it('returns 401 for an invalid key', async () => {
     const res = await request(app)
-      .post('/auth/redeem')
+      .post('/api/auth/redeem')
       .send({ key: 'bogus-key' })
 
     expect(res.status).toBe(401)
@@ -95,7 +95,7 @@ describe('POST /auth/redeem', () => {
 
   it('returns 400 when key is missing', async () => {
     const res = await request(app)
-      .post('/auth/redeem')
+      .post('/api/auth/redeem')
       .send({})
 
     expect(res.status).toBe(400)
@@ -104,7 +104,7 @@ describe('POST /auth/redeem', () => {
 
   it('returns 400 when key is empty', async () => {
     const res = await request(app)
-      .post('/auth/redeem')
+      .post('/api/auth/redeem')
       .send({ key: '' })
 
     expect(res.status).toBe(400)
@@ -116,11 +116,11 @@ describe('POST /auth/redeem', () => {
     await insertInvitation(invitation)
 
     await request(app)
-      .post('/auth/redeem')
+      .post('/api/auth/redeem')
       .send({ key: rawToken })
 
     await request(app)
-      .post('/auth/redeem')
+      .post('/api/auth/redeem')
       .send({ key: rawToken })
 
     const doc = await db().collection<{ _id: string; sessionCount: number }>('invitations').findOne({ _id: invitation.id })
@@ -130,7 +130,7 @@ describe('POST /auth/redeem', () => {
 
 describe('bearer token auth middleware', () => {
   it('returns 401 without Authorization header', async () => {
-    const res = await request(app).get('/tasks/open')
+    const res = await request(app).get('/api/tasks/open')
 
     expect(res.status).toBe(401)
     expect(res.body.error).toMatch(/Missing or invalid Authorization header/)
@@ -138,7 +138,7 @@ describe('bearer token auth middleware', () => {
 
   it('returns 401 with non-Bearer Authorization header', async () => {
     const res = await request(app)
-      .get('/tasks/open')
+      .get('/api/tasks/open')
       .set('Authorization', 'Basic abc123')
 
     expect(res.status).toBe(401)
@@ -147,7 +147,7 @@ describe('bearer token auth middleware', () => {
 
   it('returns 401 with an invalid bearer token', async () => {
     const res = await request(app)
-      .get('/tasks/open')
+      .get('/api/tasks/open')
       .set('Authorization', 'Bearer invalid-token')
 
     expect(res.status).toBe(401)

@@ -8,10 +8,11 @@ export default defineConfig({
   server: {
     host: true,
     proxy: {
+      // No rewrite: the API is mounted under /api in Express, so dev and prod
+      // share identical paths. The browser always calls /api/*.
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },

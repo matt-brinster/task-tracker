@@ -14,6 +14,23 @@ afterAll(async () => {
   await client.close()
 })
 
+describe('healthz', () => {
+  it('returns 200 without authentication', async () => {
+    const res = await request(app).get('/healthz')
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ status: 'ok' })
+  })
+})
+
+describe('static serving (minimal, no SPA fallback)', () => {
+  it('404s an unknown non-API path rather than returning the app shell', async () => {
+    const res = await request(app).get('/no-such-client-route')
+
+    expect(res.status).toBe(404)
+  })
+})
+
 describe('error handler', () => {
   it('returns 500 with JSON error when a route throws', async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -23,7 +40,7 @@ describe('error handler', () => {
     await client.close()
 
     const res = await request(app)
-      .get('/tasks/open')
+      .get('/api/tasks/open')
       .set('Authorization', `Bearer ${token}`)
 
     expect(res.status).toBe(500)

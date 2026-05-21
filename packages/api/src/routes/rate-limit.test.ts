@@ -53,14 +53,14 @@ describe('IP rate limiting on /auth', () => {
     // Send requests up to the limit
     for (let i = 0; i < 3; i++) {
       const res = await request(app)
-        .post('/auth/redeem')
+        .post('/api/auth/redeem')
         .send({ key: rawToken })
       expect(res.status).not.toBe(429)
     }
 
     // Next request should be rate limited
     const res = await request(app)
-      .post('/auth/redeem')
+      .post('/api/auth/redeem')
       .send({ key: rawToken })
 
     expect(res.status).toBe(429)
@@ -75,14 +75,14 @@ describe('user rate limiting on /tasks', () => {
     // Send requests up to the limit
     for (let i = 0; i < 3; i++) {
       const res = await request(app)
-        .get('/tasks/open')
+        .get('/api/tasks/open')
         .set('Authorization', `Bearer ${token}`)
       expect(res.status).toBe(200)
     }
 
     // Next request should be rate limited
     const res = await request(app)
-      .get('/tasks/open')
+      .get('/api/tasks/open')
       .set('Authorization', `Bearer ${token}`)
 
     expect(res.status).toBe(429)

@@ -30,7 +30,7 @@ Start the API (port 3000):
 npm run dev -w api
 ```
 
-Or run the API and MongoDB in Docker:
+Or run a prod-shaped Docker image of the API + MongoDB (no hot-reloads on code changes):
 
 ```bash
 docker compose up --build
@@ -56,15 +56,27 @@ Drop the `-- --run` to start in watch mode.
 
 ## Provisioning a user
 
+From the host (against locally-run API + MongoDB):
+
 ```bash
 cd packages/api
-npx tsx --env-file=.env src/admin/provision-cli.ts --email name@example.com
+npx tsx --env-file=.env src/admin/provision-cli.ts --email name@example.com --admin
 ```
 
-This creates a user and prints an invitation key. Enter the key on the login page to create a session.
+Or from inside the running app container (when using `docker compose up`):
+
+```bash
+docker compose exec app node packages/api/dist/admin/provision-cli.js --email name@example.com --admin
+```
+
+Either form creates a user and prints an invitation key. Enter the key on the login page to create a session.
 
 ## Stopping
 
 ```bash
 docker compose down
 ```
+
+## Deployment
+
+For production deployment (required env vars, Atlas IP allowlist, first-admin provisioning), see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
