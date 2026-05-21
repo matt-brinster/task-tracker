@@ -60,7 +60,7 @@ From the host (against locally-run API + MongoDB):
 
 ```bash
 cd packages/api
-npx tsx --env-file=.env src/admin/provision-cli.ts --email name@example.com
+npx tsx --env-file=.env src/admin/provision-cli.ts --email name@example.com --admin
 ```
 
 Or from inside the running app container (when using `docker compose up`):
