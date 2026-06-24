@@ -306,12 +306,17 @@ taskRouter.post('/:id/reorder', async (req, res) => {
     beforeSortOrder = beforeTask.sortOrder
   }
 
+  if (afterSortOrder !== null && beforeSortOrder !== null && afterSortOrder >= beforeSortOrder) {
+    res.status(400).json({ error: 'afterId must sort before beforeId' })
+    return
+  }
+
   let newSortOrder: string
   try {
     newSortOrder = generateKeyBetween(afterSortOrder, beforeSortOrder)
   } catch (err) {
     console.warn(`reorder failed for task ${task.id}: afterSortOrder=${afterSortOrder}, beforeSortOrder=${beforeSortOrder}`, err)
-    res.status(400).json({ error: 'afterId must sort before beforeId' })
+    res.status(400).json({ error: 'invalid sort order' })
     return
   }
   const updated = reorderTask(task, newSortOrder)
