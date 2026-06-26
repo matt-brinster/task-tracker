@@ -8,14 +8,38 @@ locally and provisions resources via the AWS API; nothing here runs in the cloud
 
 ## What this manages
 
-Increment 1 (current):
+Current:
 
 - **AWS provider** — `hashicorp/aws ~> 5.0`, region from `var.region` (default `us-east-1`).
 - **Security group** — attached to the account's **default VPC** (read via a data
   source, not created). Ingress: SSH (22) from `var.ssh_ingress_cidr` only, HTTP/HTTPS
   (80/443) open. Egress: all.
+- **SSH key pair** — uploads the *public* key at `var.ssh_public_key_path`. The private
+  key is generated locally (see Setup) and never enters Terraform state.
+- **EC2 instance** — latest Ubuntu 24.04 (looked up via an AMI data source),
+  `var.instance_type` (default `t3.micro`), with the security group and key pair
+  attached and a `var.root_volume_gb` gp3 root disk. Bare image; no `user_data` —
+  provisioned manually over SSH.
+- **Elastic IP** — stable public IP attached to the instance (SSH target / DNS value).
 
-Planned: key pair (increment 2), EC2 instance + Elastic IP (increment 3).
+After `apply`, SSH in with:
+
+```bash
+ssh -i ~/.ssh/task-tracker ubuntu@"$(terraform output -raw instance_public_ip)"
+```
+
+## Setup
+
+Generate the SSH key pair before the first `apply` (the key pair resource reads the
+public key off disk):
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/task-tracker -C "task-tracker-deploy"
+```
+
+This writes `~/.ssh/task-tracker` (private — keep it) and `~/.ssh/task-tracker.pub`
+(public — uploaded by Terraform). Override the path via `ssh_public_key_path` if you
+keep it elsewhere.
 
 ## Prerequisites
 
@@ -77,6 +101,9 @@ Set in `terraform.tfvars` (gitignored). Copy `terraform.tfvars.example` to start
 | `ssh_ingress_cidr` | yes | — | Your public IP as `/32` for SSH access |
 | `region` | no | `us-east-1` | |
 | `project` | no | `task-tracker` | Name/tag prefix |
+| `ssh_public_key_path` | no | `~/.ssh/task-tracker.pub` | Public key uploaded to the key pair |
+| `instance_type` | no | `t3.micro` | EC2 size (smallest Free-Plan-eligible) |
+| `root_volume_gb` | no | `20` | Root EBS volume size (GiB) |
 
 ## Files
 
