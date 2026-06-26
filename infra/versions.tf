@@ -14,8 +14,9 @@ terraform {
 }
 
 # The provider block configures the AWS plugin. Credentials are NOT set here —
-# the provider picks them up from the environment (your `aws login` session),
-# the same way the `aws` CLI does. Region comes from a variable.
+# the provider resolves them from the standard AWS credential chain (env vars,
+# shared config/credentials files, SSO). See infra/README.md for auth setup,
+# including the `aws login` -> credential_process bridge. Region from a variable.
 provider "aws" {
   region = var.region
 }
