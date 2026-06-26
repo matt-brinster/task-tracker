@@ -29,3 +29,17 @@ desktop.ini
 
 # Local Compose overrides (host-specific image pins, etc.)
 docker-compose.override.yml
+
+# Terraform (infra/)
+# State holds resource attributes in plaintext (incl. any secrets) — never commit.
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+# Crash logs and CLI config overrides
+crash.log
+crash.*.log
+.terraformrc
+terraform.rc

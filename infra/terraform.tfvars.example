@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars (gitignored) and fill in real values.
+# Find your public IP: curl ifconfig.me   — then append /32 for a single host.
+
+ssh_ingress_cidr = "203.0.113.10/32"
+
+# Optional overrides (defaults shown):
+# region  = "us-east-1"
+# project = "task-tracker"
