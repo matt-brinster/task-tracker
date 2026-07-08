@@ -35,3 +35,9 @@ variable "root_volume_gb" {
   type        = number
   default     = 20
 }
+
+variable "mongo_uri_ssm_parameter_name" {
+  description = "Name of the SSM Parameter Store SecureString holding MONGO_URI. Created OUT-OF-BAND (console or `aws ssm put-parameter`), never by Terraform — the secret must not enter TF state. The instance role is granted read access to this exact name; see README Setup → Secrets."
+  type        = string
+  default     = "/task-tracker/prod/MONGO_URI"
+}

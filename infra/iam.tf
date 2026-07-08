@@ -48,3 +48,57 @@ resource "aws_iam_instance_profile" "app" {
     Project = var.project
   }
 }
+
+# --- Permission: read the MONGO_URI secret from SSM Parameter Store ---------
+#
+# The SecureString parameter itself is created OUT-OF-BAND (see README Setup →
+# Secrets) so its plaintext value never lands in Terraform state. Terraform only
+# grants the role permission to READ that one parameter.
+#
+# We build the parameter's ARN by hand rather than with a `data "aws_ssm_parameter"`
+# source on purpose: that data source would fetch (and decrypt) the value into
+# state — exactly what we're avoiding. account_id comes from the caller identity;
+# region from var.region; the name from the variable.
+data "aws_caller_identity" "current" {}
+
+# The AWS-managed key that encrypts SSM SecureStrings by default. Reading the
+# parameter WITH decryption requires kms:Decrypt on this key — GetParameter alone
+# is not enough for a SecureString. Looking the alias up gives us its key ARN.
+data "aws_kms_alias" "ssm" {
+  name = "alias/aws/ssm"
+}
+
+# Inline policy (bound to this role, not reusable) — least privilege on two axes:
+#   - only Get* on the ONE parameter's ARN (not ssm:* , not a wildcard path)
+#   - kms:Decrypt only on the SSM key, and only when used VIA the SSM service
+#     (the ViaService condition blocks using the key for anything but SSM reads)
+resource "aws_iam_role_policy" "app_ssm_read" {
+  name = "${var.project}-ssm-read"
+  role = aws_iam_role.app.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ReadMongoUriParameter"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+        ]
+        Resource = "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter${var.mongo_uri_ssm_parameter_name}"
+      },
+      {
+        Sid      = "DecryptWithSsmKey"
+        Effect   = "Allow"
+        Action   = "kms:Decrypt"
+        Resource = data.aws_kms_alias.ssm.target_key_arn
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "ssm.${var.region}.amazonaws.com"
+          }
+        }
+      },
+    ]
+  })
+}
