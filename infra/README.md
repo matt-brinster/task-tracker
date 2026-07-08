@@ -47,6 +47,37 @@ This writes `~/.ssh/task-tracker` (private — keep it) and `~/.ssh/task-tracker
 (public — uploaded by Terraform). Override the path via `ssh_public_key_path` if you
 keep it elsewhere.
 
+### Secrets — create the `MONGO_URI` SSM parameter (out-of-band)
+
+The app's MongoDB connection string lives in **SSM Parameter Store** as a SecureString.
+Terraform **intentionally does not create it** — the instance role is granted *read*
+access to it, but the secret value never enters Terraform state. So it must exist before
+the box tries to read it. Create it once, by hand, per account/region:
+
+| Field | Value |
+|-------|-------|
+| Name  | `/task-tracker/prod/MONGO_URI` (the IAM read-grant is scoped to this exact ARN) |
+| Tier  | Standard |
+| Type  | **SecureString** |
+| KMS key | `alias/aws/ssm` (the free AWS-managed key) |
+| Value | the Atlas connection string, **including** the database path (Atlas's Connect dialog omits it; the app fails loud at startup without it) |
+
+**Console:** Systems Manager → Parameter Store → Create parameter, with the values above.
+
+**CLI:**
+
+```bash
+aws ssm put-parameter \
+  --name "/task-tracker/prod/MONGO_URI" \
+  --type SecureString \
+  --key-id alias/aws/ssm \
+  --value "mongodb+srv://…/task-tracker?…"
+```
+
+Note: the CLI form leaves the secret in your shell history — prefer the console, or read
+the value from a file / a shell configured to ignore space-prefixed commands. To rotate,
+re-run with `--overwrite`.
+
 ## Prerequisites
 
 - Terraform `>= 1.9`
