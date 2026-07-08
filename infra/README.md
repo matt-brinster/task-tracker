@@ -20,6 +20,12 @@ Current:
   `var.instance_type` (default `t3.micro`), with the security group and key pair
   attached and a `var.root_volume_gb` gp3 root disk. Bare image; no `user_data` —
   provisioned manually over SSH.
+- **IAM instance role + profile** (`${project}-ec2`) — lets the box authenticate
+  to AWS services as itself using temporary, auto-rotating credentials from the
+  instance metadata service (no access keys on disk). The role's trust policy
+  allows only the EC2 service to assume it; permissions policies (SSM read, ECR
+  pull) are attached in later increments. The instance profile is the wrapper that
+  attaches the role to the instance.
 - **Elastic IP** — stable public IP attached to the instance (SSH target / DNS value).
 
 After `apply`, SSH in with:
@@ -111,7 +117,8 @@ Set in `terraform.tfvars` (gitignored). Copy `terraform.tfvars.example` to start
 |------|---------|
 | `versions.tf` | Terraform + AWS provider version pins, provider config |
 | `variables.tf` | Input variable declarations |
-| `main.tf` | Resources (default-VPC data source, security group) |
+| `main.tf` | Resources (default-VPC data source, security group, key pair, instance, EIP) |
+| `iam.tf` | IAM instance role + profile the EC2 box assumes at runtime |
 | `outputs.tf` | Outputs (security group id, VPC id) |
 | `terraform.tfvars.example` | Template for `terraform.tfvars` |
 
