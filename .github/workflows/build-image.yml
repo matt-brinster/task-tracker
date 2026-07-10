@@ -1,0 +1,51 @@
+name: Build and push image
+
+# Build the app image on every PR to main (validation only), and additionally
+# push it to GHCR when the commit lands on main. Publishing is gated to main so
+# feature branches never publish a half-baked image.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Serialize runs per ref so two quick merges don't race on the :latest tag.
+concurrency:
+  group: build-image-${{ github.ref }}
+  # Cancel superseded PR builds (stale commits), but let main runs finish so
+  # every merged commit still publishes its immutable :<sha> image.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read      # read the repo to build it
+      packages: write      # push the image to GHCR
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      # Only authenticate when we're actually going to push (main). On PRs this
+      # step is skipped and the build below runs without a registry login.
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Builds the existing root Dockerfile. push=true only on main; on a PR the
+      # image is built (proving it assembles) but not published. Two tags on one
+      # image: :latest (moving pointer) and :<commit-sha> (immutable pin for
+      # reproducible deploys / rollback by the deployment host).
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
