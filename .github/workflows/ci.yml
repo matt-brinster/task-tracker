@@ -1,0 +1,103 @@
+name: CI
+
+# The quality gate. On every PR to main and on push to main, run the test job
+# (typecheck + both Vitest suites), then build the app image. Publishing to GHCR
+# is still gated to main so feature branches never publish a half-baked image.
+# build-push depends on test, so a red gate blocks both the build and the push.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Serialize runs per ref so two quick merges don't race on the :latest tag.
+concurrency:
+  group: ci-${{ github.ref }}
+  # Cancel superseded PR builds (stale commits), but let main runs finish so
+  # every merged commit still publishes its immutable :<sha> image.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # The API integration suite talks to a real MongoDB (no mocks). Start one as
+    # a service container with the same credentials the committed .env.test
+    # example expects, so CI needs no secrets to reach it.
+    services:
+      mongodb:
+        image: mongo:8
+        env:
+          MONGO_INITDB_ROOT_USERNAME: admin
+          MONGO_INITDB_ROOT_PASSWORD: devpassword
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck API
+        run: npm run typecheck -w api
+
+      - name: Typecheck web
+        run: npm run typecheck -w web
+
+      # The API suite reads MONGO_URI via `node --env-file=.env.test`. That file
+      # is gitignored, but the committed example points at the same
+      # admin:devpassword@localhost:27017 credentials as the service container
+      # above — so copying it verbatim is all CI needs.
+      - name: Create API test env
+        run: cp packages/api/.env.test.example packages/api/.env.test
+
+      - name: Test API
+        run: npm test -w api -- --run
+
+      - name: Test web
+        run: npm test -w web -- --run
+
+  build-push:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read      # read the repo to build it
+      packages: write      # push the image to GHCR
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      # Only authenticate when we're actually going to push (main). On PRs this
+      # step is skipped and the build below runs without a registry login.
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Builds the existing root Dockerfile. push=true only on main; on a PR the
+      # image is built (proving it assembles) but not published. Two tags on one
+      # image: :latest (moving pointer) and :<commit-sha> (immutable pin for
+      # reproducible deploys / rollback by the deployment host).
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
