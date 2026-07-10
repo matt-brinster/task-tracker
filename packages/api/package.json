@@ -6,6 +6,7 @@
     "test": "node --env-file=.env.test ../../node_modules/.bin/vitest",
     "dev": "tsx --watch --env-file=.env src/index.ts",
     "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
     "build": "rm -rf dist && tsc"
   },
   "devDependencies": {
