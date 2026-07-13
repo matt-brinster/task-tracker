@@ -31,9 +31,15 @@ variable "instance_type" {
 }
 
 variable "root_volume_gb" {
-  description = "Root EBS volume size (GiB). Larger than the AMI's 8 GiB default for build-on-box headroom."
+  description = "Root EBS volume size (GiB). A modest bump over the AMI's 8 GiB floor for Docker image/layer/log headroom — the app image is small and Atlas holds the data off-box, so we no longer need build-on-box space. Well inside the 30 GiB EBS free-tier allowance (so any value here is $0)."
   type        = number
-  default     = 20
+  default     = 12
+}
+
+variable "compose_url" {
+  description = "Raw URL of the production compose file the instance fetches at first boot. Points at the public repo's main branch so the box always pulls the current prod topology — consistent with the :latest image tag it runs. Override via tfvars to test from a feature branch before merge."
+  type        = string
+  default     = "https://raw.githubusercontent.com/matt-brinster/task-tracker/main/docker-compose.prod.yml"
 }
 
 variable "mongo_uri_ssm_parameter_name" {

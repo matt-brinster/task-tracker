@@ -17,9 +17,10 @@ Current:
 - **SSH key pair** — uploads the *public* key at `var.ssh_public_key_path`. The private
   key is generated locally (see Setup) and never enters Terraform state.
 - **EC2 instance** — latest Ubuntu 24.04 (looked up via an AMI data source),
-  `var.instance_type` (default `t3.micro`), with the security group and key pair
-  attached and a `var.root_volume_gb` gp3 root disk. Bare image; no `user_data` —
-  provisioned manually over SSH.
+  `var.instance_type` (default `t3.micro`), with the security group, key pair, and
+  instance role attached and a `var.root_volume_gb` gp3 root disk. **Self-provisions
+  on first boot** via `user_data` (see *First-boot provisioning* below) — installs
+  Docker, reads `MONGO_URI` from SSM, and runs the app from its GHCR image.
 - **IAM instance role + profile** (`${project}-ec2`) — lets the box authenticate
   to AWS services as itself using temporary, auto-rotating credentials from the
   instance metadata service (no access keys on disk). The role's trust policy
@@ -32,6 +33,39 @@ After `apply`, SSH in with:
 
 ```bash
 ssh -i ~/.ssh/task-tracker ubuntu@"$(terraform output -raw instance_public_ip)"
+```
+
+## First-boot provisioning (`user_data`)
+
+The instance provisions itself on first boot from [`user_data.sh.tftpl`](user_data.sh.tftpl),
+rendered by `templatefile()` (which injects the region, SSM parameter name, and compose URL).
+cloud-init runs the script once, as root, on the instance's first boot. It:
+
+1. installs Docker from Docker's official apt repo (+ the compose plugin) and the AWS CLI;
+2. reads `MONGO_URI` from SSM (`--with-decryption`, authenticating as the instance role via
+   the metadata service — no credentials on disk) and writes it to a root-only
+   `/opt/task-tracker/.env`;
+3. fetches `docker-compose.prod.yml` from the public repo (`var.compose_url`, defaulting to
+   `main`) — a small app-only compose that pulls the GHCR image and reads env from `.env`;
+4. `docker compose pull && up -d`.
+
+**Lifecycle:** cloud-init runs `user_data` **only on first boot** — editing the script does
+nothing to a live box. `user_data_replace_on_change = true` makes Terraform **replace the
+instance** when the rendered script changes (a fresh boot is the only way to re-run it). The
+Elastic IP is a separate resource and re-associates to the replacement, so the public/egress
+IP is stable across replaces. (A full `terraform destroy` **does** release the EIP — see
+*State* / the "don't destroy" note.)
+
+**Ordering:** because the box fetches the compose from `main`, that file must be on `main`
+before a box boots — **merge first, then apply**. To test from a feature branch pre-merge,
+override `compose_url` in `terraform.tfvars` to the branch's raw URL.
+
+**Verify after boot** (SSH in):
+
+```bash
+tail -n 50 /var/log/user-data.log                                   # provisioning trace
+docker compose -f /opt/task-tracker/docker-compose.prod.yml ps      # app container up?
+curl -s localhost:3000/healthz                                      # expect {"status":"ok"}
 ```
 
 ## Setup
@@ -140,7 +174,9 @@ Set in `terraform.tfvars` (gitignored). Copy `terraform.tfvars.example` to start
 | `project` | no | `task-tracker` | Name/tag prefix |
 | `ssh_public_key_path` | no | `~/.ssh/task-tracker.pub` | Public key uploaded to the key pair |
 | `instance_type` | no | `t3.micro` | EC2 size (smallest Free-Plan-eligible) |
-| `root_volume_gb` | no | `20` | Root EBS volume size (GiB) |
+| `root_volume_gb` | no | `12` | Root EBS volume size (GiB); inside the 30 GiB EBS free tier |
+| `mongo_uri_ssm_parameter_name` | no | `/task-tracker/prod/MONGO_URI` | SSM SecureString the box reads at boot (IAM read-grant scoped to this exact name) |
+| `compose_url` | no | GHCR-repo `main` raw URL | Prod compose the box fetches at first boot; override to a feature branch to test pre-merge |
 
 ## Files
 
@@ -148,10 +184,14 @@ Set in `terraform.tfvars` (gitignored). Copy `terraform.tfvars.example` to start
 |------|---------|
 | `versions.tf` | Terraform + AWS provider version pins, provider config |
 | `variables.tf` | Input variable declarations |
-| `main.tf` | Resources (default-VPC data source, security group, key pair, instance, EIP) |
-| `iam.tf` | IAM instance role + profile the EC2 box assumes at runtime |
-| `outputs.tf` | Outputs (security group id, VPC id) |
+| `main.tf` | Resources (default-VPC + AMI data sources, security group, key pair, instance, EIP) |
+| `iam.tf` | IAM instance role + profile the EC2 box assumes at runtime; SSM read-grant |
+| `user_data.sh.tftpl` | First-boot provisioning script (bash), rendered by `templatefile()` |
+| `outputs.tf` | Outputs (SG id, VPC id, key pair name, instance id, public IP) |
 | `terraform.tfvars.example` | Template for `terraform.tfvars` |
+
+The prod compose the box fetches, [`docker-compose.prod.yml`](../docker-compose.prod.yml), lives
+at the **repo root** (not here) — it's platform-neutral app topology, not AWS infra.
 
 ## State
 

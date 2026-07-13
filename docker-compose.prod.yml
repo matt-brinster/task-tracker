@@ -1,0 +1,28 @@
+# Production topology for the AWS EC2 box.
+#
+# Contrast with docker-compose.yml (local dev), which BUILDS the app from source
+# and runs a local MongoDB container. Production does neither:
+#   - image  — pulls the prebuilt image from GHCR (pushed by CI on merge to main),
+#              instead of `build: .`. No source on the box, no build step.
+#   - no db  — persistence is MongoDB Atlas (managed, off-box). The app reaches it
+#              via MONGO_URI, which user_data fetches from SSM Parameter Store at
+#              boot and writes to .env (kept next to this file, git-ignored, never
+#              committed). Hence env_file rather than inline environment.
+#
+# The box runs:  docker compose -f docker-compose.prod.yml up -d
+services:
+  app:
+    image: ghcr.io/matt-brinster/task-tracker:latest
+    ports:
+      # Host:container. Internal-only for now — the security group does not open
+      # 3000, so this is reachable on the box (SSH + curl localhost:3000) but not
+      # from the internet. Step 5 adds Caddy on 80/443 to reverse-proxy app:3000;
+      # this published port goes away then.
+      - "3000:3000"
+    env_file:
+      # MONGO_URI (and any other prod secrets) land here at boot, decrypted from
+      # SSM. Relative to this file's directory (/opt/task-tracker on the box).
+      - .env
+    # Bring the app back after a crash or host reboot, but respect a deliberate
+    # `docker compose stop`. Right policy for a single always-on box.
+    restart: unless-stopped

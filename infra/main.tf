@@ -93,15 +93,28 @@ resource "aws_key_pair" "deployer" {
 }
 
 # The application server. Launches into a default-VPC subnet (no subnet_id =
-# AWS picks one), attaches the security group and key pair, and gets a roomier
-# gp3 root disk than the AMI's 8 GB default (build-on-box needs the headroom).
-# No user_data: the box comes up bare and is provisioned manually over SSH.
+# AWS picks one), attaches the security group, key pair, and instance role, then
+# self-provisions on first boot via user_data (see user_data.sh.tftpl): installs
+# Docker, reads MONGO_URI from SSM, and runs the app from its GHCR image.
 resource "aws_instance" "app" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
   key_name               = aws_key_pair.deployer.key_name
   vpc_security_group_ids = [aws_security_group.app.id]
   iam_instance_profile   = aws_iam_instance_profile.app.name
+
+  # First-boot provisioning. templatefile() injects the values the script needs
+  # at render time. user_data_replace_on_change makes Terraform REPLACE the
+  # instance whenever the script changes — cloud-init runs user_data only on a
+  # first boot, so a fresh instance is the only way to re-run it. The Elastic IP
+  # is a separate resource and re-associates to the replacement, so the public
+  # IP stays stable across replaces.
+  user_data = templatefile("${path.module}/user_data.sh.tftpl", {
+    region             = var.region
+    ssm_parameter_name = var.mongo_uri_ssm_parameter_name
+    compose_url        = var.compose_url
+  })
+  user_data_replace_on_change = true
 
   root_block_device {
     volume_size = var.root_volume_gb
