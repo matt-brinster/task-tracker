@@ -121,6 +121,17 @@ resource "aws_instance" "app" {
     volume_type = "gp3"
   }
 
+  # data.aws_ami.ubuntu is re-read every plan, so a newly published Noble AMI
+  # would change `ami` — a ForceNew attribute — and replace the running box as a
+  # side effect of ANY apply (e.g. a routine ssh_ingress_cidr update when the home
+  # IP changes). Ignore drift on `ami` so upstream image churn never triggers an
+  # unintended replacement. A deliberate `terraform apply -replace=aws_instance.app`
+  # still picks up the current AMI, so this only suppresses the drive-by, not the
+  # intentional refresh.
+  lifecycle {
+    ignore_changes = [ami]
+  }
+
   tags = {
     Name    = "${var.project}-app"
     Project = var.project

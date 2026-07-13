@@ -56,6 +56,14 @@ Elastic IP is a separate resource and re-associates to the replacement, so the p
 IP is stable across replaces. (A full `terraform destroy` **does** release the EIP — see
 *State* / the "don't destroy" note.)
 
+**AMI drift is ignored.** The AMI is looked up with `most_recent = true`, and `ami` is a
+force-replace attribute, so a newly published Ubuntu AMI would otherwise replace the running
+box as a **side effect of any unrelated `apply`** (e.g. a routine `ssh_ingress_cidr` update
+when your home IP changes). `lifecycle { ignore_changes = [ami] }` on the instance suppresses
+that drive-by replacement. To deliberately move to the current AMI, force it:
+`terraform apply -replace=aws_instance.app` (re-reads the AMI data source and re-runs
+first-boot provisioning; EIP survives).
+
 **Ordering:** because the box fetches the compose from `main`, that file must be on `main`
 before a box boots — **merge first, then apply**. To test from a feature branch pre-merge,
 override `compose_url` in `terraform.tfvars` to the branch's raw URL.
