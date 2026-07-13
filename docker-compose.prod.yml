@@ -23,6 +23,14 @@ services:
       # MONGO_URI (and any other prod secrets) land here at boot, decrypted from
       # SSM. Relative to this file's directory (/opt/task-tracker on the box).
       - .env
+    environment:
+      # Non-secret config lives here (versioned with the topology), not in .env.
+      # No reverse proxy in front yet, so trust no X-Forwarded-For hops — the app's
+      # default (1) would let direct clients spoof req.ip past the per-IP auth rate
+      # limiter. MUST flip to 1 in the same change that puts Caddy in front of
+      # app:3000 (with 0, express-rate-limit fails loudly on proxied requests —
+      # ERR_ERL_UNEXPECTED_X_FORWARDED_FOR — so forgetting is caught fast).
+      TRUST_PROXY_HOPS: 0
     # Bring the app back after a crash or host reboot, but respect a deliberate
     # `docker compose stop`. Right policy for a single always-on box.
     restart: unless-stopped

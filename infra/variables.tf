@@ -46,4 +46,14 @@ variable "mongo_uri_ssm_parameter_name" {
   description = "Name of the SSM Parameter Store SecureString holding MONGO_URI. Created OUT-OF-BAND (console or `aws ssm put-parameter`), never by Terraform — the secret must not enter TF state. The instance role is granted read access to this exact name; see README Setup → Secrets."
   type        = string
   default     = "/task-tracker/prod/MONGO_URI"
+
+  # iam.tf builds the parameter's ARN as `parameter${this}` — the name's leading
+  # slash doubles as the ARN separator. SSM also allows simple names (`MONGO_URI`,
+  # no slash), which would concatenate into a malformed ARN that the read-grant
+  # never matches, while `aws ssm get-parameter --name` happily accepts either
+  # form — an AccessDenied surfacing only at first boot. Reject that at plan time.
+  validation {
+    condition     = startswith(var.mongo_uri_ssm_parameter_name, "/")
+    error_message = "Must start with '/' (e.g. \"/task-tracker/prod/MONGO_URI\") — iam.tf's ARN construction and the SSM ARN format require the fully-qualified hierarchical form."
+  }
 }

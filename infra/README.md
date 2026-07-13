@@ -68,6 +68,9 @@ docker compose -f /opt/task-tracker/docker-compose.prod.yml ps      # app contai
 curl -s localhost:3000/healthz                                      # expect {"status":"ok"}
 ```
 
+If the container is stuck **Restarting** with Mongo connection errors in `docker compose logs`,
+the usual cause is a missing Atlas allowlist entry — see *Setup → Atlas network access*.
+
 ## Setup
 
 Generate the SSH key pair before the first `apply` (the key pair resource reads the
@@ -132,6 +135,24 @@ value into `/opt/task-tracker/.env`. To propagate a rotated value:
    Compose v2 includes `env_file` contents in the service's config hash, so `up -d` detects
    the change and recreates the container.
 
+### Atlas network access — allowlist the Elastic IP
+
+Atlas rejects connections from IPs not on its **Network Access** allowlist, and the app
+**fails hard without Atlas**: startup runs `ensureIndexes()` before listening, so a blocked
+connection means the process exits and Docker's restart policy loops it — the box looks fully
+provisioned (`user-data.log` ends cleanly) while the app never comes up.
+
+After the first `apply`, add the instance's Elastic IP:
+
+- **Atlas:** Security → Network Access → Add IP Address → `terraform output -raw instance_public_ip`, as a `/32`.
+
+Ordering note: the EIP only exists *after* the first `apply`, so on a brand-new deployment the
+app will crash-loop for the minute or two until the allowlist entry is added and becomes
+active. That's expected and self-healing — the restart policy keeps retrying, and the first
+restart after the entry activates connects fine. The EIP is stable across instance
+replacements, so this is a **one-time step per deployment** — it only needs redoing if the EIP
+is released (`terraform destroy` — see the *State* note) and recreated with a new address.
+
 ## Prerequisites
 
 - Terraform `>= 1.9`
@@ -195,7 +216,7 @@ Set in `terraform.tfvars` (gitignored). Copy `terraform.tfvars.example` to start
 | `ssh_public_key_path` | no | `~/.ssh/task-tracker.pub` | Public key uploaded to the key pair |
 | `instance_type` | no | `t3.micro` | EC2 size (smallest Free-Plan-eligible) |
 | `root_volume_gb` | no | `12` | Root EBS volume size (GiB); inside the 30 GiB EBS free tier |
-| `mongo_uri_ssm_parameter_name` | no | `/task-tracker/prod/MONGO_URI` | SSM SecureString the box reads at boot (IAM read-grant scoped to this exact name) |
+| `mongo_uri_ssm_parameter_name` | no | `/task-tracker/prod/MONGO_URI` | SSM SecureString the box reads at boot (IAM read-grant scoped to this exact name). Must start with `/` — enforced by a plan-time validation |
 | `compose_url` | no | GHCR-repo `main` raw URL | Prod compose the box fetches at first boot; override to a feature branch to test pre-merge |
 
 ## Files

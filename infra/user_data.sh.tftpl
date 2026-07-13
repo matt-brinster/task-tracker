@@ -32,7 +32,13 @@ export DEBIAN_FRONTEND=noninteractive  # never prompt during apt installs
 apt-get update
 apt-get install -y ca-certificates curl
 install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+# --retry: the Elastic IP associates while this script may already be running,
+# which severs in-flight connections (the public IP swaps out from under them).
+# New connections work immediately after the swap, so retrying fully recovers —
+# and also absorbs ordinary transient network failures, which matters in a
+# script that cloud-init runs exactly once. (apt needs no equivalent flag:
+# noble's apt retries fetches 3x by default, on fresh connections.)
+curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
 chmod a+r /etc/apt/keyrings/docker.asc
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
@@ -74,7 +80,8 @@ printf 'MONGO_URI=%s\n' "$MONGO_URI" > "$APP_DIR/.env"
 set -x
 
 # --- 5. Prod compose file, fetched from the public repo ----------------------
-curl -fsSL "${compose_url}" -o "$APP_DIR/docker-compose.prod.yml"
+# --retry for the same reason as the Docker-key fetch above.
+curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 "${compose_url}" -o "$APP_DIR/docker-compose.prod.yml"
 
 # --- 6. Pull the image and start the app -------------------------------------
 # `compose pull` reads the image ref from the compose file (single source of
