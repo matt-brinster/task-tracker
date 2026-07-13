@@ -16,7 +16,7 @@ services:
     ports:
       # Host:container. Internal-only for now — the security group does not open
       # 3000, so this is reachable on the box (SSH + curl localhost:3000) but not
-      # from the internet. Step 5 adds Caddy on 80/443 to reverse-proxy app:3000;
+      # from the internet. A later step adds Caddy on 80/443 to reverse-proxy app:3000;
       # this published port goes away then.
       - "3000:3000"
     env_file:

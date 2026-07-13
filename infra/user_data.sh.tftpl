@@ -59,6 +59,10 @@ mkdir -p "$APP_DIR"
 # on exactly this one SecureString (inc. 2). No credentials on disk — the CLI
 # pulls temporary role creds from the instance metadata service automatically.
 # umask 077 makes the .env root-only (600); the file feeds compose's env_file.
+# xtrace is suspended around the secret: `set -x` would otherwise expand the
+# decrypted value into the trace, and the exec/tee above persists that trace
+# to /var/log/user-data.log and cloud-init-output.log.
+set +x
 MONGO_URI=$(aws ssm get-parameter \
   --name "${ssm_parameter_name}" \
   --with-decryption \
@@ -67,6 +71,7 @@ MONGO_URI=$(aws ssm get-parameter \
   --output text)
 umask 077
 printf 'MONGO_URI=%s\n' "$MONGO_URI" > "$APP_DIR/.env"
+set -x
 
 # --- 5. Prod compose file, fetched from the public repo ----------------------
 curl -fsSL "${compose_url}" -o "$APP_DIR/docker-compose.prod.yml"

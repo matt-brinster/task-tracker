@@ -109,8 +109,28 @@ aws ssm put-parameter \
 ```
 
 Note: the CLI form leaves the secret in your shell history — prefer the console, or read
-the value from a file / a shell configured to ignore space-prefixed commands. To rotate,
-re-run with `--overwrite`.
+the value from a file / a shell configured to ignore space-prefixed commands.
+
+**Rotation:** re-running `put-parameter` with `--overwrite` updates the *parameter only* —
+a live box does **not** pick it up. The box reads SSM once, at first boot, and freezes the
+value into `/opt/task-tracker/.env`. To propagate a rotated value:
+
+1. **Replace the instance** (canonical, no SSH): `terraform apply -replace=aws_instance.app`.
+   The fresh boot re-reads SSM. Costs a few minutes of downtime — usually acceptable, since
+   rotation typically means the old Atlas credential is being revoked anyway.
+2. **Refresh in place** (SSH, container-restart downtime only): re-run the same read the boot
+   script performs — the box has the AWS CLI and the instance role, so no credentials or
+   hand-typed secrets are involved:
+
+   ```bash
+   MONGO_URI=$(aws ssm get-parameter --name "/task-tracker/prod/MONGO_URI" \
+     --with-decryption --region us-east-1 --query Parameter.Value --output text)
+   umask 077 && printf 'MONGO_URI=%s\n' "$MONGO_URI" | sudo tee /opt/task-tracker/.env >/dev/null
+   docker compose -f /opt/task-tracker/docker-compose.prod.yml up -d
+   ```
+
+   Compose v2 includes `env_file` contents in the service's config hash, so `up -d` detects
+   the change and recreates the container.
 
 ## Prerequisites
 
