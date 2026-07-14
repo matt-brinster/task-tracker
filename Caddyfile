@@ -8,22 +8,22 @@
 # plain HTTP on :80, which the security group already allows. That's why no DNS
 # plugin and no DNS-provider API token are needed on the box.
 
-{
-	# ⚠️ LET'S ENCRYPT **STAGING** — certificates from this CA are NOT trusted by
-	# browsers (expect a click-through warning). It is here on purpose: staging
-	# has effectively no rate limits, while the production CA allows only 5
-	# duplicate certs per week per name. Caddy stores its certs in the caddy_data
-	# volume on the root EBS, so every instance replacement destroys them and
-	# forces re-issuance — and `user_data_replace_on_change` replaces the box on
-	# any user_data edit. Iterating against production would burn that quota fast.
-	#
-	# TO GO LIVE: delete this acme_ca line. Do it once the boot is known-good, so
-	# the real cert is issued on a boot that works. In the SAME change, update
-	# infra/README.md: drop `-k` from the verify block's curl (it would now skip
-	# verification of a real cert) and rewrite the TLS section's staging-CA
-	# paragraph, which describes this line as current.
-	acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
-}
+# LIVE on the Let's Encrypt PRODUCTION CA (Caddy's default — no acme_ca directive).
+# Certificates are browser-trusted; renewal is automatic at ~1/3 of remaining life.
+#
+# ⚠️ RATE LIMIT — production allows only **5 duplicate certificates per week per
+# name**. Caddy keeps its certs in the caddy_data volume on the root EBS, so every
+# instance replacement destroys them and forces a fresh issuance — and
+# `user_data_replace_on_change` replaces the box on ANY user_data edit. Replacing
+# the instance a handful of times in one week would therefore exhaust the quota and
+# lock HTTPS issuance out until the window rolls.
+#
+# So: batch user_data changes, and tune THIS file in place on the box
+# (/opt/task-tracker/Caddyfile + `docker compose up -d --force-recreate caddy`),
+# which reloads Caddy without touching the instance. If replacements ever need to be
+# frequent, either persist /data on a separate EBS volume that survives replacement,
+# or temporarily re-add the staging CA while iterating:
+#     acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
 
 # sslip.io is a wildcard DNS service: any name of the form <ip>.sslip.io resolves
 # to that IP, with no registration and no record to maintain. So this name already

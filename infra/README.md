@@ -75,14 +75,18 @@ URLs.
 **TLS / certificates.** Caddy fronts the app on 80/443 and obtains Let's Encrypt certificates
 automatically (HTTP-01 challenge over port 80 — hence 80 must stay open in the security group;
 it is not merely an HTTPS redirect). Issuance also requires the site's DNS name to already
-resolve to the box — see *Setup → DNS*. Caddy keeps certs and its ACME account key in the
-`caddy_data` Docker volume, which lives on the root EBS: it survives `compose down` and reboots
-but **not an instance replacement**. Since any `user_data` edit replaces the instance, and the
-Let's Encrypt production CA allows only **5 duplicate certificates per week per name**,
-iterating `user_data` against the production CA can exhaust the quota and lock out HTTPS
-issuance for the rest of the week. The [`Caddyfile`](../Caddyfile) therefore pins the **LE
-staging CA** while the bootstrap is still churning (staging certs are not browser-trusted —
-expect a warning). Remove the `acme_ca` line to go live, once the boot is known-good.
+resolve to the box — see *Setup → DNS*. Renewal is unattended.
+
+Now on the **production CA** — certificates are browser-trusted. The constraint to respect is
+its **rate limit: 5 duplicate certificates per week per name.** Caddy keeps certs and its ACME
+account key in the `caddy_data` Docker volume, which lives on the root EBS: it survives
+`compose down` and reboots but **not an instance replacement**. Since any `user_data` edit
+replaces the instance and forces a fresh issuance, replacing the box a handful of times in one
+week can exhaust the quota and lock out HTTPS issuance until the window rolls. So **batch
+`user_data` changes**, and tune the Caddyfile in place on the box rather than through `apply`
+(below). If you ever do need to iterate hard, temporarily re-add the LE **staging** CA to the
+[`Caddyfile`](../Caddyfile) (`acme_ca https://acme-staging-v02.api.letsencrypt.org/directory`) —
+staging has no meaningful limits, though its certs are not browser-trusted.
 
 **Iterate on the box, not through `apply`.** Two habits that save whole replace cycles: debug a
 failed boot by SSHing into the (doomed) box and running the `user_data` steps by hand — it
@@ -97,13 +101,14 @@ destroy the certificates.
 tail -n 50 /var/log/user-data.log                                   # provisioning trace
 docker compose -f /opt/task-tracker/docker-compose.prod.yml ps      # app + caddy up?
 docker compose -f /opt/task-tracker/docker-compose.prod.yml logs caddy  # cert issuance
-curl -sk "https://$(terraform output -raw site_host)/healthz"       # expect {"status":"ok"}
+curl -s "https://$(terraform output -raw site_host)/healthz"        # expect {"status":"ok"}
 ```
 
 The app publishes no host port (Caddy reaches it over the compose network), so
-`curl localhost:3000` no longer works — probe through Caddy. `-k` skips certificate
-verification, which is required while the staging CA is in use. (`terraform output` runs on
-your machine, not the box — from `infra/`. On the box, substitute the hostname.)
+`curl localhost:3000` no longer works — probe through Caddy. No `-k` needed: the certificate is
+from the production CA and is publicly trusted, so a TLS error here is a real failure, not an
+artifact. (`terraform output` runs on your machine, not the box — from `infra/`. On the box,
+substitute the hostname.)
 
 If the container is stuck **Restarting** with Mongo connection errors in `docker compose logs`,
 the usual cause is a missing Atlas allowlist entry — see *Setup → Atlas network access*.
