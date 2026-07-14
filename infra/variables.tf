@@ -42,6 +42,12 @@ variable "compose_url" {
   default     = "https://raw.githubusercontent.com/matt-brinster/task-tracker/main/docker-compose.prod.yml"
 }
 
+variable "caddyfile_url" {
+  description = "Raw URL of the Caddyfile the instance fetches at first boot, alongside the compose file. Same main-branch rationale as compose_url; override via tfvars to test from a feature branch before merge."
+  type        = string
+  default     = "https://raw.githubusercontent.com/matt-brinster/task-tracker/main/Caddyfile"
+}
+
 variable "mongo_uri_ssm_parameter_name" {
   description = "Name of the SSM Parameter Store SecureString holding MONGO_URI. Created OUT-OF-BAND (console or `aws ssm put-parameter`), never by Terraform — the secret must not enter TF state. The instance role is granted read access to this exact name; see README Setup → Secrets."
   type        = string

@@ -87,9 +87,11 @@ umask 077
 printf 'MONGO_URI=%s\n' "$MONGO_URI" > "$APP_DIR/.env"
 set -x
 
-# --- 5. Prod compose file, fetched from the public repo ----------------------
-# --retry for the same reason as the Docker-key fetch above.
+# --- 5. Prod compose file + Caddyfile, fetched from the public repo ----------
+# --retry for the same reason as the Docker-key fetch above. The compose file
+# mounts ./Caddyfile into the caddy container, so both must land in APP_DIR.
 curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 "${compose_url}" -o "$APP_DIR/docker-compose.prod.yml"
+curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 "${caddyfile_url}" -o "$APP_DIR/Caddyfile"
 
 # --- 6. Pull the image and start the app -------------------------------------
 # `compose pull` reads the image ref from the compose file (single source of

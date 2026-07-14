@@ -13,24 +13,22 @@
 services:
   app:
     image: ghcr.io/matt-brinster/task-tracker:latest
-    ports:
-      # Host:container. Internal-only for now — the security group does not open
-      # 3000, so this is reachable on the box (SSH + curl localhost:3000) but not
-      # from the internet. A later step adds Caddy on 80/443 to reverse-proxy app:3000;
-      # this published port goes away then.
-      - "3000:3000"
+    # No published port. Caddy reaches this over the compose network as app:3000,
+    # so the app is not bound to any host interface at all — not even loopback.
+    # (Consequence: `curl localhost:3000/healthz` on the box no longer works. Probe
+    # through Caddy instead, or `docker compose exec app` to get inside the network.)
     env_file:
       # MONGO_URI (and any other prod secrets) land here at boot, decrypted from
       # SSM. Relative to this file's directory (/opt/task-tracker on the box).
       - .env
     environment:
       # Non-secret config lives here (versioned with the topology), not in .env.
-      # No reverse proxy in front yet, so trust no X-Forwarded-For hops — the app's
-      # default (1) would let direct clients spoof req.ip past the per-IP auth rate
-      # limiter. MUST flip to 1 in the same change that puts Caddy in front of
-      # app:3000 (with 0, express-rate-limit fails loudly on proxied requests —
-      # ERR_ERL_UNEXPECTED_X_FORWARDED_FOR — so forgetting is caught fast).
-      TRUST_PROXY_HOPS: 0
+      # Exactly one proxy hop now sits in front of the app: Caddy, below. It sets
+      # X-Forwarded-For, and trusting that one hop is what lets req.ip see the real
+      # client instead of Caddy's container address — which the per-IP auth rate
+      # limiter depends on. Trusting one hop is safe precisely because the app has
+      # no host port: every request provably arrives via Caddy.
+      TRUST_PROXY_HOPS: 1
     healthcheck:
       # The runtime image is node:slim (no curl/wget), so node itself is the
       # probe — global fetch needs Node >= 18. NOTE: plain Docker only *marks*
@@ -45,3 +43,31 @@ services:
     # Bring the app back after a crash or host reboot, but respect a deliberate
     # `docker compose stop`. Right policy for a single always-on box.
     restart: unless-stopped
+
+  caddy:
+    # The only service exposed to the internet. Terminates TLS and reverse-proxies
+    # to app:3000. Automatic HTTPS — see ./Caddyfile for the (short) config and the
+    # staging-CA warning.
+    image: caddy:2
+    ports:
+      # 80 is not just a redirect-to-HTTPS courtesy: Let's Encrypt's HTTP-01
+      # challenge is served on it, so closing it would break certificate issuance
+      # and renewal. Both ports are already open in the security group.
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Fetched from main by user_data, next to this file (/opt/task-tracker).
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates and the ACME account key live in /data — losing it means
+      # re-issuing certs, which is rate-limited. These are named volumes on the
+      # root EBS, so they survive `compose down` and reboots but NOT an instance
+      # replacement. Hence the staging CA while user_data is still churning.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
