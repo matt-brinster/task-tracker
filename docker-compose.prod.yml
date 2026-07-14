@@ -1,0 +1,47 @@
+# Production topology for the AWS EC2 box.
+#
+# Contrast with docker-compose.yml (local dev), which BUILDS the app from source
+# and runs a local MongoDB container. Production does neither:
+#   - image  — pulls the prebuilt image from GHCR (pushed by CI on merge to main),
+#              instead of `build: .`. No source on the box, no build step.
+#   - no db  — persistence is MongoDB Atlas (managed, off-box). The app reaches it
+#              via MONGO_URI, which user_data fetches from SSM Parameter Store at
+#              boot and writes to .env (kept next to this file, git-ignored, never
+#              committed). Hence env_file rather than inline environment.
+#
+# The box runs:  docker compose -f docker-compose.prod.yml up -d
+services:
+  app:
+    image: ghcr.io/matt-brinster/task-tracker:latest
+    ports:
+      # Host:container. Internal-only for now — the security group does not open
+      # 3000, so this is reachable on the box (SSH + curl localhost:3000) but not
+      # from the internet. A later step adds Caddy on 80/443 to reverse-proxy app:3000;
+      # this published port goes away then.
+      - "3000:3000"
+    env_file:
+      # MONGO_URI (and any other prod secrets) land here at boot, decrypted from
+      # SSM. Relative to this file's directory (/opt/task-tracker on the box).
+      - .env
+    environment:
+      # Non-secret config lives here (versioned with the topology), not in .env.
+      # No reverse proxy in front yet, so trust no X-Forwarded-For hops — the app's
+      # default (1) would let direct clients spoof req.ip past the per-IP auth rate
+      # limiter. MUST flip to 1 in the same change that puts Caddy in front of
+      # app:3000 (with 0, express-rate-limit fails loudly on proxied requests —
+      # ERR_ERL_UNEXPECTED_X_FORWARDED_FOR — so forgetting is caught fast).
+      TRUST_PROXY_HOPS: 0
+    healthcheck:
+      # The runtime image is node:slim (no curl/wget), so node itself is the
+      # probe — global fetch needs Node >= 18. NOTE: plain Docker only *marks*
+      # the container (unhealthy); it never restarts it for health reasons.
+      # This is a diagnostic for `docker compose ps` and a hook for monitoring,
+      # not self-healing.
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    # Bring the app back after a crash or host reboot, but respect a deliberate
+    # `docker compose stop`. Right policy for a single always-on box.
+    restart: unless-stopped

@@ -1,0 +1,92 @@
+#!/bin/bash
+# First-boot provisioning script (cloud-init "user data").
+#
+# LIFECYCLE — this runs ONCE, as root, the first time the instance boots. Editing
+# it does NOT re-run on a live box; cloud-init only executes user_data on first
+# boot per instance. To iterate, Terraform's `user_data_replace_on_change = true`
+# replaces the instance so a fresh boot runs the new script. (The Elastic IP
+# survives the replace and re-associates — see main.tf.)
+#
+# TEMPLATING — Terraform renders this with templatefile(), substituting ${region},
+# ${ssm_parameter_name}, and ${compose_url} before the box ever sees it. Those are
+# the ONLY $${...} the template engine touches; bash's own $VAR and $(...) forms
+# are left alone (that's why the script avoids bash's $${...} brace form).
+
+set -euxo pipefail
+#  -e exit on any error   -u error on unset var   -x trace each command
+#  -o pipefail a pipe fails if any stage fails (not just the last)
+# Together: fail loud and early instead of limping to a half-provisioned box.
+
+# Mirror all output to a dedicated log so a failed boot is debuggable via SSH.
+# (cloud-init also captures this to /var/log/cloud-init-output.log; this is the
+# convenient copy to `tail`.)
+exec > >(tee -a /var/log/user-data.log) 2>&1
+echo "=== task-tracker user_data starting: $(date -u) ==="
+
+export DEBIAN_FRONTEND=noninteractive  # never prompt during apt installs
+
+# --- 1. Docker, from Docker's official apt repository -------------------------
+# Ubuntu's bundled docker.io lags upstream, so we add Docker's own repo: install
+# its signing key, register the repo (pinned to this release's codename), then
+# install the engine + the compose plugin (which provides `docker compose`).
+apt-get update
+apt-get install -y ca-certificates curl
+install -m 0755 -d /etc/apt/keyrings
+# --retry: the Elastic IP associates while this script may already be running,
+# which severs in-flight connections (the public IP swaps out from under them).
+# New connections work immediately after the swap, so retrying fully recovers —
+# and also absorbs ordinary transient network failures, which matters in a
+# script that cloud-init runs exactly once. (apt needs no equivalent flag:
+# noble's apt retries fetches 3x by default, on fresh connections.)
+curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+  > /etc/apt/sources.list.d/docker.list
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Let the default `ubuntu` login run docker without sudo (convenience for SSH
+# debugging; the boot script itself already runs as root).
+usermod -aG docker ubuntu
+
+# --- 2. AWS CLI (to read the secret from SSM at boot) ------------------------
+# Ubuntu 24.04 ships no AWS CLI. The apt package (v1) is sufficient for our one
+# call and reads the instance-role credentials off the metadata service itself.
+apt-get install -y awscli
+
+# --- 3. App directory --------------------------------------------------------
+APP_DIR=/opt/task-tracker
+mkdir -p "$APP_DIR"
+
+# --- 4. MONGO_URI from SSM Parameter Store -> .env ---------------------------
+# The box authenticates as its instance role (inc. 1) and is granted decrypt-read
+# on exactly this one SecureString (inc. 2). No credentials on disk — the CLI
+# pulls temporary role creds from the instance metadata service automatically.
+# umask 077 makes the .env root-only (600); the file feeds compose's env_file.
+# xtrace is suspended around the secret: `set -x` would otherwise expand the
+# decrypted value into the trace, and the exec/tee above persists that trace
+# to /var/log/user-data.log and cloud-init-output.log.
+set +x
+MONGO_URI=$(aws ssm get-parameter \
+  --name "${ssm_parameter_name}" \
+  --with-decryption \
+  --region "${region}" \
+  --query Parameter.Value \
+  --output text)
+umask 077
+printf 'MONGO_URI=%s\n' "$MONGO_URI" > "$APP_DIR/.env"
+set -x
+
+# --- 5. Prod compose file, fetched from the public repo ----------------------
+# --retry for the same reason as the Docker-key fetch above.
+curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 "${compose_url}" -o "$APP_DIR/docker-compose.prod.yml"
+
+# --- 6. Pull the image and start the app -------------------------------------
+# `compose pull` reads the image ref from the compose file (single source of
+# truth — no duplicated literal here) and always fetches the current :latest.
+docker compose -f "$APP_DIR/docker-compose.prod.yml" pull
+docker compose -f "$APP_DIR/docker-compose.prod.yml" up -d
+
+echo "=== task-tracker user_data finished: $(date -u) ==="
