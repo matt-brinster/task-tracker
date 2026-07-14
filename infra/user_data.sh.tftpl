@@ -51,10 +51,18 @@ apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin do
 # debugging; the boot script itself already runs as root).
 usermod -aG docker ubuntu
 
-# --- 2. AWS CLI (to read the secret from SSM at boot) ------------------------
-# Ubuntu 24.04 ships no AWS CLI. The apt package (v1) is sufficient for our one
-# call and reads the instance-role credentials off the metadata service itself.
-apt-get install -y awscli
+# --- 2. AWS CLI v2 (to read the secret from SSM at boot) ---------------------
+# Ubuntu 24.04 ships no AWS CLI, and the `awscli` apt package (v1) was dropped
+# from the Debian/Ubuntu archive — noble has no installation candidate for it.
+# So install v2 from AWS's own installer. Like v1, it needs no credentials on
+# disk: it reads the instance-role creds off the metadata service itself.
+# uname -m keeps the download arch-correct (x86_64 here, aarch64 on Graviton).
+apt-get install -y unzip
+curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 \
+  "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip
+unzip -q /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install
+rm -rf /tmp/aws /tmp/awscliv2.zip
 
 # --- 3. App directory --------------------------------------------------------
 APP_DIR=/opt/task-tracker
