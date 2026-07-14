@@ -65,6 +65,12 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
+      # Start ordering only — this does NOT wait for the app to be listening. Caddy
+      # comes up first and serves 502 until the app finishes its Atlas round-trip
+      # and binds :3000; reverse_proxy retries the dial, so that window self-heals.
+      # Deliberately NOT `condition: service_healthy`: gating Caddy on app health
+      # would also gate ACME issuance/renewal, so an app that can't reach Atlas
+      # would take HTTPS certificates down with it.
       - app
     restart: unless-stopped
 

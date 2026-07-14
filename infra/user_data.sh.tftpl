@@ -8,9 +8,9 @@
 # survives the replace and re-associates — see main.tf.)
 #
 # TEMPLATING — Terraform renders this with templatefile(), substituting ${region},
-# ${ssm_parameter_name}, and ${compose_url} before the box ever sees it. Those are
-# the ONLY $${...} the template engine touches; bash's own $VAR and $(...) forms
-# are left alone (that's why the script avoids bash's $${...} brace form).
+# ${ssm_parameter_name}, ${compose_url}, and ${caddyfile_url} before the box ever
+# sees it. Those are the ONLY $${...} the template engine touches; bash's own $VAR
+# and $(...) forms are left alone (that's why the script avoids bash's $${...} brace form).
 
 set -euxo pipefail
 #  -e exit on any error   -u error on unset var   -x trace each command

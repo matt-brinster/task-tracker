@@ -18,7 +18,10 @@
 	# any user_data edit. Iterating against production would burn that quota fast.
 	#
 	# TO GO LIVE: delete this acme_ca line. Do it once the boot is known-good, so
-	# the real cert is issued on a boot that works.
+	# the real cert is issued on a boot that works. In the SAME change, update
+	# infra/README.md: drop `-k` from the verify block's curl (it would now skip
+	# verification of a real cert) and rewrite the TLS section's staging-CA
+	# paragraph, which describes this line as current.
 	acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
 }
 

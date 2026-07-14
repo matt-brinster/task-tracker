@@ -74,7 +74,8 @@ URLs.
 
 **TLS / certificates.** Caddy fronts the app on 80/443 and obtains Let's Encrypt certificates
 automatically (HTTP-01 challenge over port 80 — hence 80 must stay open in the security group;
-it is not merely an HTTPS redirect). Caddy keeps certs and its ACME account key in the
+it is not merely an HTTPS redirect). Issuance also requires the site's DNS name to already
+resolve to the box — see *Setup → DNS*. Caddy keeps certs and its ACME account key in the
 `caddy_data` Docker volume, which lives on the root EBS: it survives `compose down` and reboots
 but **not an instance replacement**. Since any `user_data` edit replaces the instance, and the
 Let's Encrypt production CA allows only **5 duplicate certificates per week per name**,
@@ -187,6 +188,25 @@ active. That's expected and self-healing — the restart policy keeps retrying, 
 restart after the entry activates connects fine. The EIP is stable across instance
 replacements, so this is a **one-time step per deployment** — it only needs redoing if the EIP
 is released (`terraform destroy` — see the *State* note) and recreated with a new address.
+
+### DNS — point the DuckDNS record at the Elastic IP
+
+Caddy requests a certificate for the hostname named in the [`Caddyfile`](../Caddyfile)
+(`mbtasktracker.duckdns.org`), and Let's Encrypt's HTTP-01 challenge connects **inbound** to
+that name on port 80 — so the DNS record must resolve to the box before issuance can succeed.
+At [duckdns.org](https://www.duckdns.org), point the subdomain at
+`terraform output -raw instance_public_ip`, then verify:
+
+```bash
+dig +short mbtasktracker.duckdns.org    # must print the Elastic IP
+```
+
+Nothing in Terraform manages or checks this binding. If the record is missing or stale, the
+failure is **silent from the box's point of view**: `user-data.log` ends cleanly and
+`docker compose ps` shows both containers up, but Caddy sits retrying failed ACME orders in the
+background (`docker compose logs caddy` shows the errors) and HTTPS never comes up. Like the
+Atlas allowlist, this is a **one-time step per deployment** — the EIP survives instance
+replacements, so the record only needs redoing if the EIP is released and recreated.
 
 ## Prerequisites
 
