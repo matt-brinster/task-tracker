@@ -1,0 +1,34 @@
+# Caddy config for the production box. Fetched from main by user_data at first
+# boot (alongside docker-compose.prod.yml) and mounted read-only into the caddy
+# container at /etc/caddy/Caddyfile.
+#
+# Caddy does automatic HTTPS: naming a site here is enough for it to obtain a
+# Let's Encrypt certificate over ACME, serve TLS, and renew unattended. The
+# proof-of-control is the HTTP-01 challenge — LE requests a token back over
+# plain HTTP on :80, which the security group already allows. That's why no DNS
+# plugin and no DuckDNS API token are needed on the box.
+
+{
+	# ⚠️ LET'S ENCRYPT **STAGING** — certificates from this CA are NOT trusted by
+	# browsers (expect a click-through warning). It is here on purpose: staging
+	# has effectively no rate limits, while the production CA allows only 5
+	# duplicate certs per week per name. Caddy stores its certs in the caddy_data
+	# volume on the root EBS, so every instance replacement destroys them and
+	# forces re-issuance — and `user_data_replace_on_change` replaces the box on
+	# any user_data edit. Iterating against production would burn that quota fast.
+	#
+	# TO GO LIVE: delete this acme_ca line. Do it once the boot is known-good, so
+	# the real cert is issued on a boot that works. In the SAME change, update
+	# infra/README.md: drop `-k` from the verify block's curl (it would now skip
+	# verification of a real cert) and rewrite the TLS section's staging-CA
+	# paragraph, which describes this line as current.
+	acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+mbtasktracker.duckdns.org {
+	# `app` resolves over the compose network; the app no longer publishes a host
+	# port, so this is the only path to it. Caddy sets X-Forwarded-For and
+	# X-Forwarded-Proto on the way through — which is exactly the one proxy hop
+	# TRUST_PROXY_HOPS=1 tells Express to trust.
+	reverse_proxy app:3000
+}

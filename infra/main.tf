@@ -113,6 +113,7 @@ resource "aws_instance" "app" {
     region             = var.region
     ssm_parameter_name = var.mongo_uri_ssm_parameter_name
     compose_url        = var.compose_url
+    caddyfile_url      = var.caddyfile_url
   })
   user_data_replace_on_change = true
 

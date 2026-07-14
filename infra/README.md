@@ -38,15 +38,18 @@ ssh -i ~/.ssh/task-tracker ubuntu@"$(terraform output -raw instance_public_ip)"
 ## First-boot provisioning (`user_data`)
 
 The instance provisions itself on first boot from [`user_data.sh.tftpl`](user_data.sh.tftpl),
-rendered by `templatefile()` (which injects the region, SSM parameter name, and compose URL).
-cloud-init runs the script once, as root, on the instance's first boot. It:
+rendered by `templatefile()` (which injects the region, SSM parameter name, and the compose +
+Caddyfile URLs). cloud-init runs the script once, as root, on the instance's first boot. It:
 
-1. installs Docker from Docker's official apt repo (+ the compose plugin) and the AWS CLI;
+1. installs Docker from Docker's official apt repo (+ the compose plugin), then **AWS CLI v2**
+   from AWS's official installer (Ubuntu 24.04 ships no AWS CLI, and the old `awscli` apt
+   package was dropped from the archive — there is no installation candidate for it);
 2. reads `MONGO_URI` from SSM (`--with-decryption`, authenticating as the instance role via
    the metadata service — no credentials on disk) and writes it to a root-only
    `/opt/task-tracker/.env`;
-3. fetches `docker-compose.prod.yml` from the public repo (`var.compose_url`, defaulting to
-   `main`) — a small app-only compose that pulls the GHCR image and reads env from `.env`;
+3. fetches `docker-compose.prod.yml` (`var.compose_url`) and `Caddyfile` (`var.caddyfile_url`)
+   from the public repo, both defaulting to `main` — the compose pulls the GHCR image, reads env
+   from `.env`, and runs the app behind Caddy, which mounts the Caddyfile;
 4. `docker compose pull && up -d`.
 
 **Lifecycle:** cloud-init runs `user_data` **only on first boot** — editing the script does
@@ -64,17 +67,42 @@ that drive-by replacement. To deliberately move to the current AMI, force it:
 `terraform apply -replace=aws_instance.app` (re-reads the AMI data source and re-runs
 first-boot provisioning; EIP survives).
 
-**Ordering:** because the box fetches the compose from `main`, that file must be on `main`
-before a box boots — **merge first, then apply**. To test from a feature branch pre-merge,
-override `compose_url` in `terraform.tfvars` to the branch's raw URL.
+**Ordering:** because the box fetches the compose and Caddyfile from `main`, both files must be
+on `main` before a box boots — **merge first, then apply**. To test from a feature branch
+pre-merge, override `compose_url` / `caddyfile_url` in `terraform.tfvars` to the branch's raw
+URLs.
+
+**TLS / certificates.** Caddy fronts the app on 80/443 and obtains Let's Encrypt certificates
+automatically (HTTP-01 challenge over port 80 — hence 80 must stay open in the security group;
+it is not merely an HTTPS redirect). Issuance also requires the site's DNS name to already
+resolve to the box — see *Setup → DNS*. Caddy keeps certs and its ACME account key in the
+`caddy_data` Docker volume, which lives on the root EBS: it survives `compose down` and reboots
+but **not an instance replacement**. Since any `user_data` edit replaces the instance, and the
+Let's Encrypt production CA allows only **5 duplicate certificates per week per name**,
+iterating `user_data` against the production CA can exhaust the quota and lock out HTTPS
+issuance for the rest of the week. The [`Caddyfile`](../Caddyfile) therefore pins the **LE
+staging CA** while the bootstrap is still churning (staging certs are not browser-trusted —
+expect a warning). Remove the `acme_ca` line to go live, once the boot is known-good.
+
+**Iterate on the box, not through `apply`.** Two habits that save whole replace cycles: debug a
+failed boot by SSHing into the (doomed) box and running the `user_data` steps by hand — it
+carries the same instance role, security group, and Elastic IP, so it exercises the real failure
+surface in seconds. And tune the Caddyfile in place (`/opt/task-tracker/Caddyfile`, then
+`docker compose up -d`) rather than editing `user_data`, which would replace the instance and
+destroy the certificates.
 
 **Verify after boot** (SSH in):
 
 ```bash
 tail -n 50 /var/log/user-data.log                                   # provisioning trace
-docker compose -f /opt/task-tracker/docker-compose.prod.yml ps      # app container up?
-curl -s localhost:3000/healthz                                      # expect {"status":"ok"}
+docker compose -f /opt/task-tracker/docker-compose.prod.yml ps      # app + caddy up?
+docker compose -f /opt/task-tracker/docker-compose.prod.yml logs caddy  # cert issuance
+curl -sk https://mbtasktracker.duckdns.org/healthz                  # expect {"status":"ok"}
 ```
+
+The app publishes no host port (Caddy reaches it over the compose network), so
+`curl localhost:3000` no longer works — probe through Caddy. `-k` skips certificate
+verification, which is required while the staging CA is in use.
 
 If the container is stuck **Restarting** with Mongo connection errors in `docker compose logs`,
 the usual cause is a missing Atlas allowlist entry — see *Setup → Atlas network access*.
@@ -161,6 +189,25 @@ restart after the entry activates connects fine. The EIP is stable across instan
 replacements, so this is a **one-time step per deployment** — it only needs redoing if the EIP
 is released (`terraform destroy` — see the *State* note) and recreated with a new address.
 
+### DNS — point the DuckDNS record at the Elastic IP
+
+Caddy requests a certificate for the hostname named in the [`Caddyfile`](../Caddyfile)
+(`mbtasktracker.duckdns.org`), and Let's Encrypt's HTTP-01 challenge connects **inbound** to
+that name on port 80 — so the DNS record must resolve to the box before issuance can succeed.
+At [duckdns.org](https://www.duckdns.org), point the subdomain at
+`terraform output -raw instance_public_ip`, then verify:
+
+```bash
+dig +short mbtasktracker.duckdns.org    # must print the Elastic IP
+```
+
+Nothing in Terraform manages or checks this binding. If the record is missing or stale, the
+failure is **silent from the box's point of view**: `user-data.log` ends cleanly and
+`docker compose ps` shows both containers up, but Caddy sits retrying failed ACME orders in the
+background (`docker compose logs caddy` shows the errors) and HTTPS never comes up. Like the
+Atlas allowlist, this is a **one-time step per deployment** — the EIP survives instance
+replacements, so the record only needs redoing if the EIP is released and recreated.
+
 ## Prerequisites
 
 - Terraform `>= 1.9`
@@ -225,7 +272,8 @@ Set in `terraform.tfvars` (gitignored). Copy `terraform.tfvars.example` to start
 | `instance_type` | no | `t3.micro` | EC2 size (smallest Free-Plan-eligible) |
 | `root_volume_gb` | no | `12` | Root EBS volume size (GiB); inside the 30 GiB EBS free tier |
 | `mongo_uri_ssm_parameter_name` | no | `/task-tracker/prod/MONGO_URI` | SSM SecureString the box reads at boot (IAM read-grant scoped to this exact name). Must start with `/` — enforced by a plan-time validation |
-| `compose_url` | no | GHCR-repo `main` raw URL | Prod compose the box fetches at first boot; override to a feature branch to test pre-merge |
+| `compose_url` | no | repo `main` raw URL | Prod compose the box fetches at first boot; override to a feature branch to test pre-merge |
+| `caddyfile_url` | no | repo `main` raw URL | Caddyfile the box fetches at first boot, mounted into the caddy container; same pre-merge override applies |
 
 ## Files
 
