@@ -75,14 +75,18 @@ URLs.
 **TLS / certificates.** Caddy fronts the app on 80/443 and obtains Let's Encrypt certificates
 automatically (HTTP-01 challenge over port 80 — hence 80 must stay open in the security group;
 it is not merely an HTTPS redirect). Issuance also requires the site's DNS name to already
-resolve to the box — see *Setup → DNS*. Caddy keeps certs and its ACME account key in the
-`caddy_data` Docker volume, which lives on the root EBS: it survives `compose down` and reboots
-but **not an instance replacement**. Since any `user_data` edit replaces the instance, and the
-Let's Encrypt production CA allows only **5 duplicate certificates per week per name**,
-iterating `user_data` against the production CA can exhaust the quota and lock out HTTPS
-issuance for the rest of the week. The [`Caddyfile`](../Caddyfile) therefore pins the **LE
-staging CA** while the bootstrap is still churning (staging certs are not browser-trusted —
-expect a warning). Remove the `acme_ca` line to go live, once the boot is known-good.
+resolve to the box — see *Setup → DNS*. Renewal is unattended.
+
+Now on the **production CA** — certificates are browser-trusted. The constraint to respect is
+its **rate limit: 5 duplicate certificates per week per name.** Caddy keeps certs and its ACME
+account key in the `caddy_data` Docker volume, which lives on the root EBS: it survives
+`compose down` and reboots but **not an instance replacement**. Since any `user_data` edit
+replaces the instance and forces a fresh issuance, replacing the box a handful of times in one
+week can exhaust the quota and lock out HTTPS issuance until the window rolls. So **batch
+`user_data` changes**, and tune the Caddyfile in place on the box rather than through `apply`
+(below). If you ever do need to iterate hard, temporarily re-add the LE **staging** CA to the
+[`Caddyfile`](../Caddyfile) (`acme_ca https://acme-staging-v02.api.letsencrypt.org/directory`) —
+staging has no meaningful limits, though its certs are not browser-trusted.
 
 **Iterate on the box, not through `apply`.** Two habits that save whole replace cycles: debug a
 failed boot by SSHing into the (doomed) box and running the `user_data` steps by hand — it
@@ -97,12 +101,14 @@ destroy the certificates.
 tail -n 50 /var/log/user-data.log                                   # provisioning trace
 docker compose -f /opt/task-tracker/docker-compose.prod.yml ps      # app + caddy up?
 docker compose -f /opt/task-tracker/docker-compose.prod.yml logs caddy  # cert issuance
-curl -sk https://mbtasktracker.duckdns.org/healthz                  # expect {"status":"ok"}
+curl -s "https://$(terraform output -raw site_host)/healthz"        # expect {"status":"ok"}
 ```
 
 The app publishes no host port (Caddy reaches it over the compose network), so
-`curl localhost:3000` no longer works — probe through Caddy. `-k` skips certificate
-verification, which is required while the staging CA is in use.
+`curl localhost:3000` no longer works — probe through Caddy. No `-k` needed: the certificate is
+from the production CA and is publicly trusted, so a TLS error here is a real failure, not an
+artifact. (`terraform output` runs on your machine, not the box — from `infra/`. On the box,
+substitute the hostname.)
 
 If the container is stuck **Restarting** with Mongo connection errors in `docker compose logs`,
 the usual cause is a missing Atlas allowlist entry — see *Setup → Atlas network access*.
@@ -189,17 +195,33 @@ restart after the entry activates connects fine. The EIP is stable across instan
 replacements, so this is a **one-time step per deployment** — it only needs redoing if the EIP
 is released (`terraform destroy` — see the *State* note) and recreated with a new address.
 
-### DNS — point the DuckDNS record at the Elastic IP
+### DNS — nothing to configure (sslip.io)
 
-Caddy requests a certificate for the hostname named in the [`Caddyfile`](../Caddyfile)
-(`mbtasktracker.duckdns.org`), and Let's Encrypt's HTTP-01 challenge connects **inbound** to
-that name on port 80 — so the DNS record must resolve to the box before issuance can succeed.
-At [duckdns.org](https://www.duckdns.org), point the subdomain at
-`terraform output -raw instance_public_ip`, then verify:
+Caddy requests a certificate for the hostname named in the [`Caddyfile`](../Caddyfile), which is
+of the form `<elastic-ip>.sslip.io`. **sslip.io is a wildcard DNS service** — any `<ip>.sslip.io`
+name resolves to that IP — so there is no account, no record, and nothing to keep in sync. The
+hostname *is* the Elastic IP. Verify (from `infra/`):
 
 ```bash
-dig +short mbtasktracker.duckdns.org    # must print the Elastic IP
+terraform output -raw site_host        # the hostname Caddy serves
+dig +short "$(terraform output -raw site_host)"        # must print the Elastic IP
 ```
+
+The catch: **the Caddyfile hostname is coupled to the Elastic IP.** If the EIP ever changes
+(only a `terraform destroy` does that — see the *State* note), the site name in the Caddyfile
+must be changed to match, or Caddy will request a certificate for a name that no longer points
+at the box. Moving to a real registered domain is the fix if the name ever needs to outlive the
+address.
+
+> **Why not DuckDNS** (the original choice): Let's Encrypt could not issue for
+> `mbtasktracker.duckdns.org` — its validators timed out on the mandatory **CAA** lookup.
+> Measured directly against DuckDNS's authoritative nameservers, 6 of 9 were entirely
+> unresponsive and the rest dropped about half their queries (5 answers out of 27); sslip.io
+> answered 9 of 9. Recursive resolvers mask this by caching and retrying across all nine
+> nameservers, so `dig` and browsers look fine — but LE performs fresh, uncached lookups from
+> several vantage points under a tight timeout budget, and gives up. **Debugging note:** a
+> healthy-looking `dig` does *not* mean LE can validate; query the authoritative nameservers
+> directly (`dig CAA <name> @<ns>`) to see what LE sees.
 
 Nothing in Terraform manages or checks this binding. If the record is missing or stale, the
 failure is **silent from the box's point of view**: `user-data.log` ends cleanly and

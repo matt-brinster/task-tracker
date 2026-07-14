@@ -6,26 +6,43 @@
 # Let's Encrypt certificate over ACME, serve TLS, and renew unattended. The
 # proof-of-control is the HTTP-01 challenge — LE requests a token back over
 # plain HTTP on :80, which the security group already allows. That's why no DNS
-# plugin and no DuckDNS API token are needed on the box.
+# plugin and no DNS-provider API token are needed on the box.
 
-{
-	# ⚠️ LET'S ENCRYPT **STAGING** — certificates from this CA are NOT trusted by
-	# browsers (expect a click-through warning). It is here on purpose: staging
-	# has effectively no rate limits, while the production CA allows only 5
-	# duplicate certs per week per name. Caddy stores its certs in the caddy_data
-	# volume on the root EBS, so every instance replacement destroys them and
-	# forces re-issuance — and `user_data_replace_on_change` replaces the box on
-	# any user_data edit. Iterating against production would burn that quota fast.
-	#
-	# TO GO LIVE: delete this acme_ca line. Do it once the boot is known-good, so
-	# the real cert is issued on a boot that works. In the SAME change, update
-	# infra/README.md: drop `-k` from the verify block's curl (it would now skip
-	# verification of a real cert) and rewrite the TLS section's staging-CA
-	# paragraph, which describes this line as current.
-	acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
-}
+# LIVE on the Let's Encrypt PRODUCTION CA (Caddy's default — no acme_ca directive).
+# Certificates are browser-trusted; renewal is automatic at ~1/3 of remaining life.
+#
+# ⚠️ RATE LIMIT — production allows only **5 duplicate certificates per week per
+# name**. Caddy keeps its certs in the caddy_data volume on the root EBS, so every
+# instance replacement destroys them and forces a fresh issuance — and
+# `user_data_replace_on_change` replaces the box on ANY user_data edit. Replacing
+# the instance a handful of times in one week would therefore exhaust the quota and
+# lock HTTPS issuance out until the window rolls.
+#
+# So: batch user_data changes, and tune THIS file in place on the box
+# (/opt/task-tracker/Caddyfile + `docker compose up -d --force-recreate caddy`),
+# which reloads Caddy without touching the instance. If replacements ever need to be
+# frequent, either persist /data on a separate EBS volume that survives replacement,
+# or temporarily re-add the staging CA while iterating:
+#     acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
 
-mbtasktracker.duckdns.org {
+# sslip.io is a wildcard DNS service: any name of the form <ip>.sslip.io resolves
+# to that IP, with no registration and no record to maintain. So this name already
+# points at the Elastic IP — the hostname IS the address.
+#
+# WHY NOT DuckDNS (the original choice, 2026-07-14): Let's Encrypt could not issue
+# for mbtasktracker.duckdns.org — its validators kept timing out on the mandatory
+# CAA lookup. Measured against DuckDNS's own authoritative nameservers: 6 of 9 were
+# entirely unresponsive and the rest dropped ~half their queries (5 answers out of
+# 27). Recursive resolvers hide this by caching and retrying across all nine, which
+# is why `dig` and browsers looked fine; LE does fresh uncached lookups from several
+# vantage points under a tight timeout and simply gives up. sslip.io's nameservers
+# answered 9 of 9 on the same test.
+#
+# TRADE-OFF: the IP is baked into the hostname, so this URL only survives as long as
+# the Elastic IP does. That is already a standing rule (never `terraform destroy` —
+# it releases the EIP), but it means moving to a real domain later is the fix if the
+# name ever needs to outlive the address.
+100.31.18.48.sslip.io {
 	# `app` resolves over the compose network; the app no longer publishes a host
 	# port, so this is the only path to it. Caddy sets X-Forwarded-For and
 	# X-Forwarded-Proto on the way through — which is exactly the one proxy hop

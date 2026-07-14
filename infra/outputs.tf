@@ -24,3 +24,16 @@ output "instance_public_ip" {
   description = "Stable Elastic IP of the instance. SSH target and DNS A-record value."
   value       = aws_eip.app.public_ip
 }
+
+# sslip.io is wildcard DNS: <ip>.sslip.io resolves to that IP, with no account and
+# no record to maintain. So the site's hostname is a pure function of the Elastic IP
+# — derived here rather than written down, so it can't drift from reality.
+#
+# ⚠️ This is NOT wired into the Caddyfile, which hardcodes the same name (Caddy reads
+# a static file fetched from the repo; Terraform never renders it). If the EIP ever
+# changes, ../Caddyfile must be edited to match — this output is how you find the
+# name it should hold.
+output "site_host" {
+  description = "Public hostname Caddy serves and requests a certificate for. Must match the site name in ../Caddyfile."
+  value       = "${aws_eip.app.public_ip}.sslip.io"
+}
