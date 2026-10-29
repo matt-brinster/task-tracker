@@ -26,7 +26,9 @@ jobs:
     # example expects, so CI needs no secrets to reach it.
     services:
       mongodb:
-        image: mongo:8
+        # Pinned to 7: MongoDB 8 refuses to start on Linux kernel 6.19+, which
+        # the runners now use (SERVER-121912). Return to 8 once a fix ships.
+        image: mongo:7
         env:
           MONGO_INITDB_ROOT_USERNAME: admin
           MONGO_INITDB_ROOT_PASSWORD: devpassword
