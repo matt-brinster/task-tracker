@@ -4,7 +4,7 @@ A task manager for family use. Monorepo with an Express API backend and a React 
 
 ## Prerequisites
 
-- Node.js 22+
+- Node.js 24+
 - Docker/Podman and Compose (for MongoDB)
 
 ## Setup
